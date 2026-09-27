@@ -7,15 +7,15 @@ gotenberg:
 paperless-ngx:
   enabled: true
 
-# --- Plattformdienste per Operator ------------
-# Löst die Bitnami-Subcharts `postgresql` und `redis` ab. Default aus; Werte für prod in
-# einer eigenen Wertedatei.
+# --- Platform services via operators ------------
+# Replaces the Bitnami subcharts `postgresql` and `redis`. Off by default; enable them in your own
+# values file (docs/operators.md lists the operators).
 
-# Postgres über CNPG (templates/cnpg-cluster.yaml, templates/cnpg-backup.yaml).
+# Postgres via CloudNativePG (templates/cnpg-cluster.yaml, templates/cnpg-backup.yaml).
 cnpg:
   enabled: false
   name: paperless-db
-  # Fester Tag, dieselbe Image-Art wie die übrigen CNPG-Cluster im Cluster.
+  # Pinned tag, e.g. ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
   image: ""
   instances: 1
   storageSize: 5Gi
@@ -23,7 +23,7 @@ cnpg:
   owner: paperless
   resources: {}
   parameters: {}
-  # Datenübernahme aus der alten Datenbank — wirkt nur beim Anlegen des Clusters.
+  # Import from an existing database — only applies when the cluster is created.
   import:
     enabled: false
     host: ""
@@ -42,7 +42,7 @@ cnpg:
     retentionPolicy: "30d"
     schedule: "0 30 1 * * *"
 
-# Redis über den OT-redis-operator (templates/redis.yaml).
+# Redis via the OT-CONTAINER-KIT redis-operator (templates/redis.yaml).
 redisOperator:
   enabled: false
   name: paperless-redis
@@ -50,8 +50,7 @@ redisOperator:
   image: ""
   resources: {}
 
-# HTTPRoute(s) am geteilten Envoy-Gateway. Aus per Default;
-# eigene Werte siehe README.
+# HTTPRoute(s) on a Gateway (Gateway API). Off by default; see the README for an example.
 httpRoute:
   enabled: false
   parentRef: {}

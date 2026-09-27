@@ -22,11 +22,11 @@
 *.tmproj
 .vscode/
 
-# Lokale Prüfwerkzeuge
+# Local check tooling
 Taskfile.yml
 tools/
 
-# Repo-Werkzeuge, nicht Teil des Pakets
+# Repository tooling, not part of the package
 ci/
 tests/
 tools/

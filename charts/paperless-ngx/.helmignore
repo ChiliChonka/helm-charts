@@ -22,7 +22,7 @@
 *.tmproj
 .vscode/
 
-# Repo-Werkzeuge, nicht Teil des Pakets
+# Repository tooling, not part of the package
 ci/
 tests/
 tools/

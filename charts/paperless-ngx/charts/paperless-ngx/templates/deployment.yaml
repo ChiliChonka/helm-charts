@@ -52,11 +52,11 @@ spec:
                 name: {{ include "webserver.fullname" . }}-configuration
           env:
             {{- /*
-              Zugangsdaten aus Secrets der Operatoren. `env` hat Vorrang vor
-              `envFrom`, überschreibt also PAPERLESS_DBUSER/-DBPASS aus dem Secret `-db`.
-              REDIS_PASSWORD steht VOR PAPERLESS_REDIS, damit `$(REDIS_PASSWORD)` in
-              paperlessVars.PAPERLESS_REDIS_OVERWRITE aufgelöst wird (Kubernetes löst nur
-              Variablen auf, die in der Liste davor stehen).
+              Credentials from the operators' Secrets. `env` takes precedence over `envFrom`,
+              so it overrides PAPERLESS_DBUSER/-DBPASS from the `-db` Secret.
+              REDIS_PASSWORD comes BEFORE PAPERLESS_REDIS so that `$(REDIS_PASSWORD)` in
+              paperlessVars.PAPERLESS_REDIS_OVERWRITE is resolved (Kubernetes only expands
+              variables defined earlier in the list).
             */}}
             - name: PAPERLESS_SECRET_KEY
               valueFrom:
@@ -95,8 +95,8 @@ spec:
             {{- end }}
           {{- with .Values.startupProbe }}
           {{- /*
-            Solange er nicht bestanden ist, ruhen Liveness und Readiness. Nötig, weil paperless
-            Migrationen VOR dem Webserver ausführt; v3 hasht dabei alle Dateien neu.
+            Until it succeeds, liveness and readiness are paused. Needed because paperless runs
+            migrations BEFORE starting the web server; v3 re-hashes every file while doing so.
           */}}
           startupProbe:
             {{- toYaml . | nindent 12 }}
@@ -113,7 +113,7 @@ spec:
           {{- end }}
       initContainers:
       - name: wait-for-services-up-and-running
-        # Fester Tag + Digest: vorher ohne Tag = `latest`. 0.25.2 = der bis dahin laufende Digest.
+        # Pinned tag + digest (previously untagged = `latest`). 0.25.2 = the digest that was running.
         image: docker.io/powerman/dockerize:0.25.2@sha256:ffbc7a88b04f83e911145b1dc7010b4c3c9c5420cc6b30ca1763e6aeb245bcd1
         args:
           - -timeout

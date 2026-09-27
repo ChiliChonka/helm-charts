@@ -17,6 +17,6 @@ spec:
     - {{ . }}
 {{- end }}
   nfs:
-    server: {{ required "nfs.frigate.server fehlt (nfs.frigate.enabled)" .Values.nfs.frigate.server }}
-    path: {{ required "nfs.frigate.path fehlt (nfs.frigate.enabled)" .Values.nfs.frigate.path }}
+    server: {{ required "nfs.frigate.server is required when nfs.frigate.enabled" .Values.nfs.frigate.server }}
+    path: {{ required "nfs.frigate.path is required when nfs.frigate.enabled" .Values.nfs.frigate.path }}
 {{- end }}

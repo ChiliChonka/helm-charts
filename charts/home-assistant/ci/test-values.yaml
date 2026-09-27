@@ -1,4 +1,4 @@
-# Erfundene Werte für die Chart-Prüfung (CI) — kein echter Betrieb.
+# Made-up values for the chart checks (CI) — not a real deployment.
 nfs:
   enabled: true
   server: 192.0.2.10

@@ -1,70 +1,72 @@
-# Voraussetzungen: Operatoren und Plattform
+# Prerequisites: operators and platform
 
-Die Charts bringen ihre Datenbank, ihren Cache und ihren Eingang **nicht** selbst mit. Sie legen
-nur die Custom Resources an (`Cluster`, `Redis`, `HTTPRoute` …); die Operatoren dafür laufen einmal
-im Cluster. Welches Chart was braucht, steht in der Tabelle im [README](../README.md).
+The charts do **not** bring their own database, cache or ingress. They only create the custom
+resources (`Cluster`, `Redis`, `HTTPRoute` …); the operators for them run once per cluster. Which
+chart needs what is listed in the table in the [README](../README.md).
 
-Grundsatz: **ein Operator je Dienst, cluster-weit, eine Instanz je App im Namespace der App.**
-Datenbanken und Caches werden nicht zwischen Apps geteilt — ein Update, ein Ausfall oder ein
-Restore trifft nur die eine App.
+Principle: **one operator per service, cluster-wide; one instance per app, in the app's
+namespace.** Databases and caches are not shared between apps — an update, an outage or a restore
+only affects that one app.
 
-Getestete Versionen (Stand 2026-09-27). Immer mit fester Version installieren; ein Lauf ohne
-`--version` nimmt stillschweigend das Neueste.
+Tested versions (as of 2026-09-27). Always install with a pinned version; a run without
+`--version` silently takes the latest.
 
 ## CloudNativePG (Postgres)
 
 ```bash
 helm repo add cnpg https://cloudnative-pg.github.io/charts
 helm upgrade --install cnpg cnpg/cloudnative-pg --version 0.29.0 \
-  -n cnpg-system --create-namespace --wait        # Operator 1.30.0
+  -n cnpg-system --create-namespace --wait        # operator 1.30.0
 ```
 
-Das Chart bringt seine CRDs selbst mit (`crds.create: true`). CNPG bestimmt, welche
-Kubernetes-Versionen tragen — vor einem Kubernetes-Upgrade die Support-Matrix prüfen.
+The chart ships its own CRDs (`crds.create: true`). CloudNativePG determines which Kubernetes
+versions are supported — check its support matrix before a Kubernetes upgrade.
 
-### Barman-Cloud-Plugin (Backups nach S3)
+### Barman Cloud plugin (backups to S3)
 
-Für `cnpg.backup.enabled` in den Charts. Setzt **cert-manager** voraus (das Plugin spricht mit dem
-Operator über TLS).
+Needed for `cnpg.backup.enabled` in the charts. Requires **cert-manager** (the plugin talks to the
+operator over TLS).
 
 ```bash
 kubectl apply -f https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.15.0/manifest.yaml
 kubectl -n cnpg-system rollout status deploy/barman-cloud
 ```
 
-Das eingebaute Barman (`Cluster.spec.backup.barmanObjectStore`) ist seit CNPG 1.26 abgekündigt und
-fällt mit 1.31 weg; die Charts nutzen deshalb nur das Plugin (`ObjectStore` + `ScheduledBackup`).
+The built-in Barman support (`Cluster.spec.backup.barmanObjectStore`) is deprecated since
+CloudNativePG 1.26 and goes away with 1.31; the charts therefore only use the plugin
+(`ObjectStore` + `ScheduledBackup`).
 
-**Hinweis für Knoten-Wartung:** Ein CNPG-Cluster mit einer Instanz blockiert `kubectl drain`
-(PodDisruptionBudget). Vorher `spec.nodeMaintenanceWindow: {inProgress: true, reusePVC: true}`
-setzen, danach wieder entfernen — siehe CNPG-Doku „Kubernetes upgrade and maintenance“.
+**Node maintenance:** a CloudNativePG cluster with a single instance blocks `kubectl drain`
+(PodDisruptionBudget). Set `spec.nodeMaintenanceWindow: {inProgress: true, reusePVC: true}`
+before draining and remove it afterwards — see the CloudNativePG documentation “Kubernetes
+upgrade and maintenance”.
 
-## S3 (Ziel der Backups)
+## S3 (backup target)
 
-Jeder S3-kompatible Speicher. Die Charts erwarten nur `cnpg.backup.endpointURL`, den Bucket
-(`destinationPath`) und ein Secret mit `ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`
-(`cnpg.backup.credentialsSecret`). Den Bucket legt weder CNPG noch das Plugin an.
+Any S3-compatible storage. The charts only need `cnpg.backup.endpointURL`, the bucket
+(`destinationPath`) and a Secret with `ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`
+(`cnpg.backup.credentialsSecret`). Neither CloudNativePG nor the plugin creates the bucket.
 
 ## Redis (OT-CONTAINER-KIT redis-operator)
 
-Für paperless-ngx (`redisOperator.enabled`, Celery-Broker ohne Persistenz).
+For paperless-ngx (`redisOperator.enabled`, Celery broker without persistence).
 
 ```bash
 helm repo add ot-helm https://ot-container-kit.github.io/helm-charts/
 helm upgrade --install redis-operator ot-helm/redis-operator --version 0.26.1 \
-  -n redis-operator --create-namespace --wait     # Operator v0.26.0
+  -n redis-operator --create-namespace --wait     # operator v0.26.0
 ```
 
-- **Helm aktualisiert CRDs aus `crds/` nicht.** Bei einem Operator-Update die CRDs vorher aus dem
-  neuen Chart mit `kubectl apply --server-side` einspielen.
-- Ohne `kubernetesConfig.redisSecret` hat eine `Redis`-Instanz **kein Passwort** — jeder Pod im
-  Cluster erreicht sie. Das paperless-Chart erzeugt deshalb ein Passwort-Secret.
-- Die Images (`quay.io/opstree/redis`) mit festem Tag verwenden.
+- **Helm does not update CRDs from `crds/`.** When upgrading the operator, apply the CRDs from the
+  new chart first with `kubectl apply --server-side`.
+- Without `kubernetesConfig.redisSecret` a `Redis` instance has **no password** — every pod in the
+  cluster can reach it. The paperless chart therefore generates a password Secret.
+- Use the images (`quay.io/opstree/redis`) with a pinned tag.
 
-## Keycloak-Operator (optional)
+## Keycloak operator (optional)
 
-Keines der Charts braucht Keycloak zwingend. Für Single Sign-on: Keycloak liefert den Operator
-nur als Manifeste (kein Helm-Chart), per Default auf den eigenen Namespace beschränkt.
+None of the charts requires Keycloak. For single sign-on: Keycloak ships the operator only as
+manifests (no Helm chart), watching its own namespace by default.
 
 ```bash
 V=26.7.4
@@ -76,25 +78,24 @@ kubectl create namespace keycloak
 kubectl -n keycloak apply -f $B/kubernetes.yml
 ```
 
-Ab 26.7 kommen zwei CRDs dazu (`keycloakoidcclients`, `keycloaksamlclients`); ohne sie startet der
-Operator nicht.
-Für einen Operator, der alle Namespaces beobachtet, liefert Keycloak im selben Repo eine eigene
-Variante unter `kubernetes/cluster-wide/`.
+Version 26.7 added two CRDs (`keycloakoidcclients`, `keycloaksamlclients`); the operator does not
+start without them. For an operator that watches all namespaces, Keycloak provides a separate
+variant in the same repository under `kubernetes/cluster-wide/`.
 
-## Eingang: Gateway API
+## Ingress: Gateway API
 
-Die Charts veröffentlichen sich über eine `HTTPRoute` (`httpRoute.*`), kein Ingress. Getestet mit
-**Envoy Gateway v1.9.1**; jede Gateway-API-Implementierung mit HTTPRoute sollte gehen.
-`httpRoute.parentRef.sectionName` muss auf den HTTPS-Listener zeigen, sonst hängt die Route auch am
-HTTP-Listener. Envoy begrenzt Anfragen ohne `timeouts.request` auf 15 s — Uploads und Streams
-brauchen einen eigenen Wert (jellyfin: 10 h).
+The charts are exposed through an `HTTPRoute` (`httpRoute.*`), not an Ingress. Tested with
+**Envoy Gateway v1.9.1**; any Gateway API implementation supporting HTTPRoute should work.
+`httpRoute.parentRef.sectionName` must point to the HTTPS listener, otherwise the route also
+attaches to the HTTP listener. Envoy Gateway limits requests to 15 s unless `timeouts.request` is
+set — uploads and streams need their own value (jellyfin: 10 h).
 
 ## NFS (optional)
 
-jellyfin und home-assistant können ihre Daten von einer bestehenden NFS-Freigabe nehmen
-(`nfs.*`): Das Chart legt dann statische PersistentVolumes mit `Retain` an. Für **dynamische**
-NFS-Volumes stattdessen `csi-driver-nfs` (getestet 4.13.4) mit einer StorageClass.
+jellyfin and home-assistant can take their data from an existing NFS export (`nfs.*`): the chart
+then creates static PersistentVolumes with `Retain`. For **dynamic** NFS volumes use
+`csi-driver-nfs` (tested 4.13.4) with a StorageClass instead.
 
 ## cert-manager
 
-Für das Barman-Plugin und für Zertifikate am Gateway. Getestet v1.21.2.
+For the Barman plugin and for certificates on the gateway. Tested v1.21.2.

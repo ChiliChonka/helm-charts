@@ -1,33 +1,33 @@
 jellyfin:
 
-  # Optional: Medien und Konfiguration von einer bestehenden NFS-Freigabe. Dann legt das Chart je
-  # ein PersistentVolume (Retain) und einen passenden Claim an; `persistence.*.existingClaim`
-  # benennt den Claim (siehe README, Beispiel). Ohne NFS nimmt das Upstream-Chart seine Default-
-  # Persistenz über die StorageClass des Clusters.
+  # Optional: media and configuration from an existing NFS export. The chart then creates one
+  # PersistentVolume (Retain) plus a matching claim for each; `persistence.*.existingClaim` names
+  # the claim (see the README example). Without NFS the upstream chart uses its default persistence
+  # via the cluster's StorageClass.
   nfs:
     enabled: false
-    server: ""          # Pflicht, wenn ein Volume eingeschaltet ist, z. B. 192.0.2.10
+    server: ""          # required when a volume is enabled, e.g. 192.0.2.10
     media:
       enabled: false
-      path: ""          # z. B. /export/jellyfin/media
+      path: ""          # e.g. /export/jellyfin/media
       size: 100Gi
     config:
       enabled: false
-      path: ""          # z. B. /export/jellyfin/config
+      path: ""          # e.g. /export/jellyfin/config
       size: 5Gi
 
   serviceAccount:
     create: false
     automount: false
 
-  # Fester Tag statt dem Default des Upstream-Charts. Image-Tag und `appVersion` in Chart.yaml
-  # laufen gemeinsam (tools/check_chart.py prüft das).
+  # Pinned tag instead of the upstream chart's default. The image tag and `appVersion` in
+  # Chart.yaml move together (tools/check_chart.py checks this).
   image:
     tag: "12.1"
 
-  # Reserve für gelegentliches Transcoding. Bewusst KEINE CPU-Grenze: Jellyfin transkodiert in
-  # Software, ein 1080p-Transcode kann mehr als 2 Kerne brauchen — an einer Grenze würde gedrosselt,
-  # das Video ruckelt. Die Anfrage reserviert den Grundbedarf; die Speichergrenze schützt den Knoten.
+  # Headroom for occasional transcoding. Deliberately NO CPU limit: Jellyfin transcodes in
+  # software, a 1080p transcode can need more than 2 cores — a limit would throttle it and the
+  # video stutters. The request reserves the baseline; the memory limit protects the node.
   resources:
     requests:
       cpu: 250m
@@ -35,15 +35,15 @@ jellyfin:
     limits:
       memory: 2Gi
 
-  # Recreate statt RollingUpdate: Beim Rolling Update startet der neue Pod NEBEN dem alten, zwei
-  # Jellyfin-Instanzen arbeiten dann auf derselben Datenbank. `rollingUpdate: null`, weil der
-  # API-Server dort sonst Standardwerte einträgt, die mit Recreate unzulässig sind.
+  # Recreate instead of RollingUpdate: a rolling update starts the new pod NEXT TO the old one, and
+  # two Jellyfin instances then work on the same database. `rollingUpdate: null` because the API
+  # server would otherwise fill in defaults that are invalid with Recreate.
   deploymentStrategy:
     type: Recreate
     rollingUpdate: null
 
-  # Checks mit Reserve: 1 s Timeout ist unter Last (Transkodieren, Bibliotheks-Scan) zu knapp.
-  # Startup: 10 Minuten für den ersten Start nach einem Update mit Datenbank-Umbau.
+  # Probes with headroom: a 1 s timeout is too tight under load (transcoding, library scans).
+  # Startup: 10 minutes for the first start after an update that migrates the database.
   livenessProbe:
     timeoutSeconds: 5
     failureThreshold: 5
@@ -52,8 +52,8 @@ jellyfin:
   startupProbe:
     failureThreshold: 60
 
-# HTTPRoute am Gateway (Gateway API, templates/httproute.yaml). Aus per Default. `sectionName` ist
-# Pflicht (der HTTPS-Listener), Streams brauchen einen langen `timeouts.request`.
+# HTTPRoute on a Gateway (Gateway API, templates/httproute.yaml). Off by default. `sectionName`
+# (the HTTPS listener) is required; streams need a long `timeouts.request`.
 httpRoute:
   enabled: false
   parentRef: {}

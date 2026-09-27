@@ -1,10 +1,11 @@
 {{- /*
-  Recorder-Datenbank von Home Assistant über CNPG — statt SQLite auf NFS (Datei-Sperren über NFS unzuverlässig).
+  Home Assistant recorder database via CloudNativePG — instead of SQLite on NFS (file locking over
+  NFS is unreliable).
 
-  - Zugangsdaten erzeugt CNPG im Secret `<name>-app` (Schlüssel `uri` = fertige
-    postgresql://-URL); Home Assistant bekommt sie per env.valueFrom, nie über die Werte.
-  - Das Schema legt Home Assistant beim ersten Start selbst an.
-  - Backup über das Barman-Cloud-Plugin: ObjectStore und ScheduledBackup in cnpg-backup.yaml.
+  - CNPG creates the credentials in the Secret `<name>-app` (key `uri` = complete postgresql://
+    URL); Home Assistant reads it via env.valueFrom, never through the values.
+  - Home Assistant creates the schema itself on first start.
+  - Backup via the Barman Cloud plugin: ObjectStore and ScheduledBackup in cnpg-backup.yaml.
 */ -}}
 {{- if .Values.cnpg.enabled }}
 {{- $c := .Values.cnpg }}
@@ -15,7 +16,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   instances: {{ $c.instances }}
-  imageName: {{ required "cnpg.image fehlt (fester Tag)" $c.image }}
+  imageName: {{ required "cnpg.image is required (pinned tag)" $c.image }}
   storage:
     size: {{ $c.storageSize }}
   {{- with $c.resources }}

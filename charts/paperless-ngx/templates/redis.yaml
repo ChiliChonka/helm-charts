@@ -1,10 +1,10 @@
 {{- /*
-  Redis über den OT-redis-operator — löst das Bitnami-Subchart `redis` ab.
-  Für paperless nur Celery-Broker: keine Persistenz (kein spec.storage).
+  Redis via the OT-CONTAINER-KIT redis-operator, replacing the Bitnami `redis` subchart.
+  For paperless it is only the Celery broker: no persistence (no spec.storage).
 
-  Passwort: Ohne `redisSecret` ist die Instanz ohne Anmeldung aus jedem Namespace erreichbar
-  (nachgewiesen). Das Passwort wird einmal
-  erzeugt und per `lookup` bei jedem Upgrade beibehalten — nie in Git.
+  Password: without `redisSecret` the instance is reachable without authentication from every
+  namespace (verified). The password is generated once and kept on every upgrade via `lookup` —
+  never in Git.
 */ -}}
 {{- if .Values.redisOperator.enabled }}
 {{- $r := .Values.redisOperator }}
@@ -16,7 +16,7 @@ metadata:
   name: {{ $secretName }}
   namespace: {{ .Release.Namespace }}
   annotations:
-    # Bleibt bei `helm uninstall` stehen: Das Passwort soll eine Neuinstallation überleben.
+    # Kept on `helm uninstall`: the password should survive a reinstall.
     helm.sh/resource-policy: keep
 type: Opaque
 data:
@@ -33,7 +33,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   kubernetesConfig:
-    image: {{ required "redisOperator.image fehlt (fester Tag)" $r.image }}
+    image: {{ required "redisOperator.image is required (pinned tag)" $r.image }}
     imagePullPolicy: IfNotPresent
     redisSecret:
       name: {{ $secretName }}

@@ -1,6 +1,6 @@
 replicaCount: 1
-# Deployment-Strategie. Leer = Kubernetes-Default (RollingUpdate). Fuer eine Replik auf gemeinsamem
-# NFS: {type: Recreate, rollingUpdate: null} - sonst laufen beim Update zwei Instanzen gleichzeitig.
+# Deployment strategy. Empty = Kubernetes default (RollingUpdate). For a single replica on shared
+# NFS: {type: Recreate, rollingUpdate: null} - otherwise two instances run side by side during an update.
 strategy: {}
 
 image:
@@ -43,9 +43,9 @@ service:
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 8000
 
-# Kein Ingress mehr: Erreichbar über die HTTPRoute des Wrapper-Charts am Envoy-Gateway
-# (ingress-nginx seit 2026-09-22 abgebaut). Vorlage und Werte entfernt — der Default war
-# `enabled: true` und hätte ohne Override einen Ingress angelegt.
+# No Ingress: exposed via the HTTPRoute of the wrapper chart (Gateway API). Template and values
+# were removed — the former default `enabled: true` would have created an Ingress without an
+# override.
 
 resources:
   limits:
@@ -56,7 +56,7 @@ resources:
     memory: 1024Mi
 
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-# Optional. Ohne Wert kein startupProbe (Verhalten wie bisher).
+# Optional. Without a value there is no startupProbe.
 startupProbe: {}
 
 livenessProbe:
@@ -258,7 +258,7 @@ paperlessVars:
 
 envs: []
 
-# Zugangsdaten aus Secrets der Operatoren statt aus paperlessVars.
+# Credentials from the operators' Secrets instead of paperlessVars.
 # dbCredentialsSecret: { name: paperless-db-app, usernameKey: username, passwordKey: password }
 dbCredentialsSecret: {}
 # redisPasswordSecret: { name: paperless-redis-auth, key: password } -- dazu

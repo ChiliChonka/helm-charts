@@ -1,6 +1,6 @@
 version: '3'
 tasks:
   check:
-    desc: Alle Charts prüfen (lint, Render mit Defaults und CI-Werten, Tests) — wie die CI
+    desc: Check all charts (lint, render with defaults and CI values, tests) — same as CI
     cmds:
       - ./scripts/check.sh

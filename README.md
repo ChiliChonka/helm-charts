@@ -1,37 +1,37 @@
 # helm-charts
 
-Wrapper-Charts für selbst betriebene Apps auf Kubernetes: das Upstream-Chart der App, dazu das,
-was im Eigenbetrieb fehlt — Datenbank und Cache über Operatoren statt eingebetteter Subcharts,
-Backups nach S3, eine `HTTPRoute` für die Gateway API, optional Daten von einer NFS-Freigabe.
+Wrapper charts for self-hosted apps on Kubernetes: the app's upstream chart plus what is missing
+when you run it yourself — database and cache via operators instead of embedded subcharts, backups
+to S3, an `HTTPRoute` for the Gateway API, and optionally data from an NFS export.
 
-| Chart | Verzeichnis | App | braucht | optional |
+| Chart | Directory | App | Requires | Optional |
 |---|---|---|---|---|
-| `jellyfin-helm-chart` | [`charts/jellyfin`](charts/jellyfin) | [Jellyfin](https://jellyfin.org) 12.1, Upstream [jellyfin-helm](https://github.com/jellyfin/jellyfin-helm) | — | NFS, Gateway API |
-| `home-assistant-helm-chart` | [`charts/home-assistant`](charts/home-assistant) | [Home Assistant](https://www.home-assistant.io), Upstream [pajikos](https://github.com/pajikos/home-assistant-helm-chart) | — | CNPG (Recorder-DB) + Barman-Plugin, NFS, Gateway API |
-| `paperless-ngx` | [`charts/paperless-ngx`](charts/paperless-ngx) | [paperless-ngx](https://docs.paperless-ngx.com) 3.2, mit Tika und Gotenberg | CNPG, redis-operator | Barman-Plugin, Gateway API |
+| `jellyfin-helm-chart` | [`charts/jellyfin`](charts/jellyfin) | [Jellyfin](https://jellyfin.org) 12.1, upstream [jellyfin-helm](https://github.com/jellyfin/jellyfin-helm) | — | NFS, Gateway API |
+| `home-assistant-helm-chart` | [`charts/home-assistant`](charts/home-assistant) | [Home Assistant](https://www.home-assistant.io), upstream [pajikos](https://github.com/pajikos/home-assistant-helm-chart) | — | CloudNativePG (recorder DB) + Barman plugin, NFS, Gateway API |
+| `paperless-ngx` | [`charts/paperless-ngx`](charts/paperless-ngx) | [paperless-ngx](https://docs.paperless-ngx.com) 3.2 with Tika and Gotenberg | CloudNativePG, redis-operator | Barman plugin, Gateway API |
 
-Installation der Operatoren und getestete Versionen: [`docs/operators.md`](docs/operators.md).
+Installing the operators, with tested versions: [`docs/operators.md`](docs/operators.md).
 
-## Installieren
+## Install
 
-Die Charts liegen als OCI-Artefakte in der GitHub Container Registry:
+The charts are published as OCI artifacts in the GitHub Container Registry:
 
 ```bash
 helm install jellyfin oci://ghcr.io/chilichonka/charts/jellyfin-helm-chart --version 1.1.0 \
   -n jellyfin --create-namespace -f my-values.yaml
 ```
 
-Die Defaults sind neutral und ohne Umgebungsbezug: kein NFS, keine Route, keine Datenbank. Was man
-einschaltet, steht in der `values.yaml` des Charts, dort mit Beispielen. Erfundene, vollständige
-Beispiele: `charts/*/ci/test-values.yaml`.
+The defaults are neutral and environment-agnostic: no NFS, no route, no database. Everything you
+can switch on is documented in each chart's `values.yaml`, with examples. Complete made-up
+examples: `charts/*/ci/test-values.yaml`.
 
-**Secrets** stehen nie in den Werten. Die Charts verweisen nur auf vorhandene Secrets
-(`credentialsSecret`, `existingSecret` …) oder nehmen die, die die Operatoren erzeugen (CNPG legt
-`<cluster>-app` mit den Zugangsdaten an).
+**Secrets never go into values.** The charts only reference existing Secrets
+(`credentialsSecret`, `existingSecret` …) or use the ones the operators create (CloudNativePG
+creates `<cluster>-app` with the credentials).
 
-## Beispiele
+## Examples
 
-**Jellyfin mit Medien von NFS**, erreichbar über ein Gateway:
+**Jellyfin with media from NFS**, exposed through a Gateway:
 
 ```yaml
 jellyfin:
@@ -52,10 +52,10 @@ httpRoute:
       rules:
         - backendRefs: [{name: jellyfin, port: 8096}]
           matches: [{path: {type: PathPrefix, value: /}}]
-          timeouts: {request: 10h0m0s}     # Streams
+          timeouts: {request: 10h0m0s}     # streams
 ```
 
-**Home Assistant mit Recorder-Datenbank in CNPG:**
+**Home Assistant with the recorder database in CloudNativePG:**
 
 ```yaml
 cnpg:
@@ -69,30 +69,30 @@ home-assistant:
       valueFrom: {secretKeyRef: {name: home-assistant-db-app, key: uri}}
 ```
 
-dazu in `configuration.yaml`: `recorder: db_url: !env_var HA_RECORDER_DB_URL`.
+plus `recorder: db_url: !env_var HA_RECORDER_DB_URL` in `configuration.yaml`.
 
-## Eigenheiten, die man kennen sollte
+## Things worth knowing
 
-- **jellyfin** läuft mit `Recreate` und genau einer Replik: Zwei Instanzen auf derselben Datenbank
-  beschädigen sie. Keine CPU-Grenze — Software-Transcoding würde sonst gedrosselt.
-- **home-assistant** braucht hinter einem Gateway `trusted_proxies`; die Defaults decken die
-  privaten Netze ab. `ingress.external: true` bleibt gesetzt, obwohl kein Ingress läuft — nur so
-  legt das Subchart die Proxy-Einstellung bei einer Neuinstallation an.
-- **paperless-ngx:** Alle Einstellungen der App (`paperless-ngx.paperlessVars`) sind in der
-  [offiziellen Doku](https://docs.paperless-ngx.com/configuration/) beschrieben.
-- **paperless-ngx 3** braucht `PAPERLESS_SECRET_KEY` (das Chart erzeugt ihn einmal und behält ihn);
-  entfernte Einstellungen aus Version 2 lehnt das Chart beim Rendern ab.
+- **jellyfin** runs with `Recreate` and exactly one replica: two instances on the same database
+  corrupt it. No CPU limit — software transcoding would be throttled otherwise.
+- **home-assistant** needs `trusted_proxies` behind a gateway; the defaults cover the private
+  ranges. `ingress.external: true` stays set although no Ingress runs — only then does the
+  subchart configure the proxy settings on a fresh install.
+- **paperless-ngx:** all app settings (`paperless-ngx.paperlessVars`) are described in the
+  [official documentation](https://docs.paperless-ngx.com/configuration/).
+- **paperless-ngx 3** requires `PAPERLESS_SECRET_KEY` (the chart generates it once and keeps it);
+  settings removed in version 3 make the render fail instead of being silently ignored.
 
-## Entwicklung
+## Development
 
 ```bash
-task check        # oder ./scripts/check.sh — lint, Render mit Defaults und CI-Werten, Tests
+task check        # or ./scripts/check.sh — lint, render with defaults and CI values, tests
 ```
 
-Release eines Charts: Version in `Chart.yaml` anheben, Tag `<verzeichnis>-v<version>` pushen
-(z. B. `jellyfin-v1.1.0`); die CI prüft, dass Tag und `Chart.yaml` übereinstimmen, und schiebt das
-Paket nach `oci://ghcr.io/chilichonka/charts`.
+Releasing a chart: bump the version in `Chart.yaml`, push a tag `<directory>-v<version>`
+(e.g. `jellyfin-v1.1.0`); CI checks that tag and `Chart.yaml` agree and pushes the package to
+`oci://ghcr.io/chilichonka/charts`.
 
-## Lizenz
+## License
 
-[Apache-2.0](LICENSE). Die eingebundenen Upstream-Charts behalten ihre eigenen Lizenzen.
+[Apache-2.0](LICENSE). The included upstream charts keep their own licenses.

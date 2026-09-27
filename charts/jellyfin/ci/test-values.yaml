@@ -1,4 +1,4 @@
-# Erfundene Werte für die Chart-Prüfung (tools/check_chart.py, CI) — kein echter Betrieb.
+# Made-up values for the chart checks (tools/check_chart.py, CI) — not a real deployment.
 jellyfin:
   nfs:
     enabled: true

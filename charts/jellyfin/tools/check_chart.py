@@ -1,10 +1,10 @@
-"""Prüft die Invarianten des vollständig gerenderten Charts, ohne Cluster-Zugriff.
+"""Checks the invariants of the fully rendered chart, without cluster access.
 
-Geprüft werden Eigenschaften, die jede künftige Version erfüllen muss (eine Replik, Recreate,
-Retain, Route am HTTPS-Listener, Stream-Timeout, Daten-Claims) — keine konkreten Werte wie
-Image-Tag oder Ressourcenzahlen, die sich mit jedem Update ändern dürfen. Gerendert wird mit den
-erfundenen Werten aus ci/test-values.yaml. Zusätzliche Argumente gehen an `helm template` (für
-Gegenproben: `python3 tools/check_chart.py --set …` muss scheitern). Aufruf im Chart-Verzeichnis.
+Checked are properties every future version must keep (one replica, Recreate, Retain, route on
+the HTTPS listener, stream timeout, data claims) — not concrete values such as the image tag or
+resource numbers, which may change with every update. Rendering uses the made-up values from
+ci/test-values.yaml. Extra arguments are passed to `helm template` (for counter-checks:
+`python3 tools/check_chart.py --set …` must fail). Run from the chart directory.
 """
 import subprocess
 import sys
@@ -22,7 +22,7 @@ def render(*args):
 
 def require(condition, message):
     if not condition:
-        raise SystemExit(f"FEHLER: {message}")
+        raise SystemExit(f"ERROR: {message}")
 
 
 def chart_app_version():
@@ -34,50 +34,50 @@ documents = render(*sys.argv[1:])
 kinds = sorted(doc["kind"] for doc in documents)
 require(kinds == sorted(["Deployment", "Service", "HTTPRoute", "PersistentVolume",
                          "PersistentVolume", "PersistentVolumeClaim", "PersistentVolumeClaim"]),
-        f"Unerwartete Ressourcen im Render: {kinds}")
+        f"Unexpected resources in render: {kinds}")
 
 deployment = next(doc for doc in documents if doc["kind"] == "Deployment")
 spec = deployment["spec"]
 app = spec["template"]["spec"]["containers"][0]
 
-# Eine Instanz auf der Datenbank, und nie zwei gleichzeitig (gemeinsames NFS-Verzeichnis).
-require(spec["replicas"] == 1, "Genau eine Replik: nur eine Jellyfin-Instanz darf die Datenbank nutzen")
+# One instance on the database, never two at once (shared NFS directory).
+require(spec["replicas"] == 1, "Exactly one replica: only one Jellyfin instance may use the database")
 require(spec["strategy"]["type"] == "Recreate" and not spec["strategy"].get("rollingUpdate"),
-        "strategy Recreate ohne rollingUpdate erforderlich")
+        "strategy Recreate without rollingUpdate required")
 
-# Image-Tag und appVersion laufen gemeinsam (README, Versionierung).
+# Image tag and appVersion move together.
 tag = app["image"].rsplit(":", 1)[-1]
 require(tag == chart_app_version(),
-        f"Image-Tag {tag} passt nicht zu appVersion {chart_app_version()} in Chart.yaml")
+        f"Image tag {tag} does not match appVersion {chart_app_version()} in Chart.yaml")
 
-# Ressourcen: Anfrage und Speichergrenze gesetzt, aber KEINE CPU-Grenze (Software-Transcoding).
+# Resources: request and memory limit set, but NO CPU limit (software transcoding).
 res = app.get("resources") or {}
 require(res.get("requests", {}).get("cpu") and res.get("requests", {}).get("memory"),
-        "CPU- und Speicher-Anfrage müssen gesetzt sein")
-require(res.get("limits", {}).get("memory"), "Speichergrenze muss gesetzt sein")
+        "CPU and memory requests must be set")
+require(res.get("limits", {}).get("memory"), "Memory limit must be set")
 require("cpu" not in res.get("limits", {}),
-        "Keine CPU-Grenze: Software-Transcoding würde gedrosselt (README, Ressourcen)")
+        "No CPU limit: software transcoding would be throttled")
 
-# Checks mit Reserve.
+# Probes with headroom.
 require(app["livenessProbe"].get("timeoutSeconds", 1) >= 5
         and app["readinessProbe"].get("timeoutSeconds", 1) >= 5,
-        "Liveness/Readiness brauchen mindestens 5 s Timeout")
+        "Liveness/readiness need a timeout of at least 5 s")
 
-# Daten bleiben, wo sie sind.
+# Data stays where it is.
 claims = {v["name"]: v["persistentVolumeClaim"]["claimName"]
           for v in spec["template"]["spec"]["volumes"] if "persistentVolumeClaim" in v}
 require(claims == {"config": "jellyfin-config", "media": "jellyfin-media"},
-        f"Bestehende Daten-Claims müssen erhalten bleiben, gefunden: {claims}")
+        f"Existing data claims must be kept, found: {claims}")
 pvs = [d for d in documents if d["kind"] == "PersistentVolume"]
 require(all(pv["spec"]["persistentVolumeReclaimPolicy"] == "Retain" for pv in pvs),
-        "Beide NFS-Volumes müssen Retain behalten")
+        "Both NFS volumes must keep Retain")
 
-# Am Gateway, und zwar am benannten HTTPS-Listener (ohne sectionName hinge sie auch am HTTP-Listener).
+# On a gateway, on the named HTTPS listener (without sectionName it would also attach to HTTP).
 route = next(d for d in documents if d["kind"] == "HTTPRoute")
 parent = route["spec"]["parentRefs"][0]
 require(parent.get("name") and parent.get("sectionName"),
-        "Route braucht Gateway und sectionName (HTTPS-Listener)")
+        "Route needs a gateway and sectionName (HTTPS listener)")
 require(route["spec"]["rules"][0]["timeouts"]["request"] == "10h0m0s",
-        "Stream-Timeout von 10 h verändert")
+        "Stream timeout of 10 h changed")
 
-print(f"OK: 7 Ressourcen; Invarianten erfüllt (Image {tag}, Ressourcen {res})")
+print(f"OK: 7 resources; invariants hold (image {tag}, resources {res})")

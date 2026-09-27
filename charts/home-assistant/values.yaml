@@ -1,10 +1,10 @@
-# Optional: Konfiguration (und Frigate-Aufnahmen) von einer bestehenden NFS-Freigabe. Dann legt
-# das Chart ein statisches PersistentVolume (Retain) samt Claim an, an den sich das StatefulSet
-# des Subcharts bindet. Ohne NFS: `home-assistant.persistence` mit einer StorageClass.
+# Optional: configuration (and Frigate recordings) from an existing NFS export. The chart then
+# creates a static PersistentVolume (Retain) plus claim that the subchart's StatefulSet binds to.
+# Without NFS: use `home-assistant.persistence` with a StorageClass.
 nfs:
   enabled: false
-  server: ""          # Pflicht bei nfs.enabled, z. B. 192.0.2.10
-  path: ""            # z. B. /export/home-assistant/config
+  server: ""          # required when nfs.enabled, e.g. 192.0.2.10
+  path: ""            # e.g. /export/home-assistant/config
   capacity: 100Gi
   accessMode: ReadWriteOnce
   mountOptions:
@@ -14,8 +14,8 @@ nfs:
     - wsize=1048576
     - hard
     - timeo=600
-  # Aufnahmen einer Frigate-Installation lesend einbinden (dazu additionalVolumes/-Mounts im
-  # Subchart setzen, siehe README).
+  # Mount the recordings of a Frigate installation read-only (also set additionalVolumes/-Mounts
+  # in the subchart, see the README).
   frigate:
     enabled: false
     server: ""
@@ -40,8 +40,8 @@ home-assistant:
   env:
     - name: TZ
       value: UTC
-    # Mit cnpg.enabled: Recorder-Datenbank aus dem von CNPG erzeugten Secret, dazu in
-    # configuration.yaml `recorder: db_url: !env_var HA_RECORDER_DB_URL` (README).
+    # With cnpg.enabled: recorder database from the Secret CNPG creates, plus
+    # `recorder: db_url: !env_var HA_RECORDER_DB_URL` in configuration.yaml (README).
     # - name: HA_RECORDER_DB_URL
     #   valueFrom: {secretKeyRef: {name: home-assistant-db-app, key: uri}}
 
@@ -54,10 +54,9 @@ home-assistant:
     fsGroup: 1000
     fsGroupChangePolicy: "OnRootMismatch"
 
-  # Erreichbar über die HTTPRoute unten, der Ingress bleibt aus. `external: true` trotzdem: Nur
-  # damit legt das Subchart `http-storage.json` an, aus der das Init-Skript bei einer
-  # NEUINSTALLATION die vertrauten Proxys einrichtet (ohne sie lehnt Home Assistant Anfragen über
-  # ein Gateway mit 400 ab).
+  # Exposed via the HTTPRoute below, the Ingress stays off. `external: true` anyway: only then does
+  # the subchart create `http-storage.json`, from which the init script sets up the trusted proxies
+  # on a FRESH install (without them Home Assistant rejects requests through a gateway with 400).
   ingress:
     external: true
 
@@ -85,8 +84,8 @@ home-assistant:
       - 192.168.0.0/16
       - 127.0.0.0/8
 
-# HTTPRoute am Gateway (Gateway API, templates/httproute.yaml). Aus per Default; `sectionName`
-# (der HTTPS-Listener) ist Pflicht.
+# HTTPRoute on a Gateway (Gateway API, templates/httproute.yaml). Off by default; `sectionName`
+# (the HTTPS listener) is required.
 httpRoute:
   enabled: false
   parentRef: {}
@@ -97,12 +96,12 @@ httpRoute:
   #       - backendRefs: [{name: home-assistant, port: 8080}]
   #         matches: [{path: {type: PathPrefix, value: /}}]
 
-# Recorder-Datenbank (History, Langzeitstatistik) über CNPG statt SQLite — setzt den
-# CNPG-Operator voraus (docs/operators.md). Backups über das Barman-Cloud-Plugin nach S3.
+# Recorder database (history, long-term statistics) via CloudNativePG instead of SQLite — requires
+# the CNPG operator (docs/operators.md). Backups to S3 via the Barman Cloud plugin.
 cnpg:
   enabled: false
   name: home-assistant-db
-  image: ""           # fester Tag, z. B. ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  image: ""           # pinned tag, e.g. ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
   instances: 1
   storageSize: 5Gi
   database: homeassistant
@@ -111,10 +110,10 @@ cnpg:
   parameters: {}
   backup:
     enabled: false
-    destinationPath: ""       # z. B. s3://home-assistant-db-backup
-    endpointURL: ""           # beliebiges S3
-    credentialsSecret: ""     # Secret mit den beiden Schlüsseln unten, von Hand oder per Operator
+    destinationPath: ""       # e.g. s3://home-assistant-db-backup
+    endpointURL: ""           # any S3-compatible endpoint
+    credentialsSecret: ""     # Secret with the two keys below, created by hand or by an operator
     accessKeyIdKey: ACCESS_KEY_ID
     secretAccessKeyKey: SECRET_ACCESS_KEY
     retentionPolicy: "30d"
-    schedule: "0 0 2 * * *"   # 6 Felder, mit Sekunden
+    schedule: "0 0 2 * * *"   # 6 fields, with seconds

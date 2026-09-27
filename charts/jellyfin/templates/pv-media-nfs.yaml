@@ -12,6 +12,6 @@ spec:
   storageClassName: ""
   volumeMode: Filesystem
   nfs:
-    server: {{ required "jellyfin.nfs.server fehlt (NFS eingeschaltet)" .Values.jellyfin.nfs.server }}
-    path: {{ required "jellyfin.nfs.media.path fehlt" .Values.jellyfin.nfs.media.path }}
+    server: {{ required "jellyfin.nfs.server is required when an NFS volume is enabled" .Values.jellyfin.nfs.server }}
+    path: {{ required "jellyfin.nfs.media.path is required" .Values.jellyfin.nfs.media.path }}
 {{- end }}

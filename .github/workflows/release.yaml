@@ -1,7 +1,7 @@
 name: release
 
-# Ein Chart je Tag: <verzeichnis>-v<version>, z. B. jellyfin-v1.1.0 für charts/jellyfin.
-# Die Version im Tag muss der in Chart.yaml entsprechen. Ziel: oci://ghcr.io/<owner>/charts.
+# One chart per tag: <directory>-v<version>, e.g. jellyfin-v1.1.0 for charts/jellyfin.
+# The version in the tag must match Chart.yaml. Target: oci://ghcr.io/<owner>/charts.
 on:
   push:
     tags:
@@ -19,20 +19,20 @@ jobs:
       - uses: azure/setup-helm@v4
       - run: pip install pyyaml
 
-      - name: Chart und Version aus dem Tag
+      - name: Chart and version from the tag
         id: tag
         run: |
           tag="${GITHUB_REF_NAME}"
           dir="${tag%-v*}"; version="${tag##*-v}"
-          test -f "charts/${dir}/Chart.yaml" || { echo "::error::charts/${dir} gibt es nicht"; exit 1; }
+          test -f "charts/${dir}/Chart.yaml" || { echo "::error::charts/${dir} does not exist"; exit 1; }
           chart_version=$(python3 -c "import yaml;print(yaml.safe_load(open('charts/${dir}/Chart.yaml'))['version'])")
-          test "${version}" = "${chart_version}" || { echo "::error::Tag ${version} ≠ Chart.yaml ${chart_version}"; exit 1; }
+          test "${version}" = "${chart_version}" || { echo "::error::tag ${version} does not match Chart.yaml ${chart_version}"; exit 1; }
           echo "dir=${dir}" >> "$GITHUB_OUTPUT"
 
-      - name: Alle Charts prüfen
+      - name: Check all charts
         run: ./scripts/check.sh
 
-      - name: Paketieren und nach GHCR
+      - name: Package and push to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

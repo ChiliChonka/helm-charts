@@ -1,14 +1,13 @@
 {{- /*
-  Postgres über CNPG — löst das
-  Bitnami-Subchart `postgresql` ab. Der Operator läuft cluster-weit (cnpg-system), die Instanz
-  hier im Namespace der App.
+  Postgres via CloudNativePG, replacing the Bitnami `postgresql` subchart. The operator runs
+  cluster-wide (cnpg-system), the instance lives in the app's namespace.
 
-  - Zugangsdaten erzeugt CNPG selbst im Secret `<name>-app` (Schlüssel username/password/host …).
-    Kein Passwort in den Werten.
-  - `import` gilt NUR beim Anlegen des Clusters (Bootstrap). Er liest die Quelldatenbank per
-    pg_dump — während des Imports darf die App nicht schreiben (paperless auf 0 skalieren).
-    Danach wirkungslos; die Werte bleiben stehen, damit sich die Spec nicht ändert.
-  - Backup über das Barman-Cloud-Plugin: ObjectStore und ScheduledBackup in cnpg-backup.yaml.
+  - CNPG creates the credentials itself in the Secret `<name>-app` (keys username/password/host …).
+    No password in the values.
+  - `import` applies ONLY when the cluster is created (bootstrap). It reads the source database via
+    pg_dump — the app must not write during the import (scale paperless to 0). Without effect
+    afterwards; the values stay in place so the spec does not change.
+  - Backup via the Barman Cloud plugin: ObjectStore and ScheduledBackup in cnpg-backup.yaml.
 */ -}}
 {{- if .Values.cnpg.enabled }}
 {{- $c := .Values.cnpg }}
@@ -19,7 +18,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   instances: {{ $c.instances }}
-  imageName: {{ required "cnpg.image fehlt (fester Tag)" $c.image }}
+  imageName: {{ required "cnpg.image is required (pinned tag)" $c.image }}
   storage:
     size: {{ $c.storageSize }}
   {{- with $c.resources }}
@@ -55,12 +54,12 @@ spec:
   externalClusters:
     - name: import-source
       connectionParameters:
-        host: {{ required "cnpg.import.host fehlt" $c.import.host | quote }}
+        host: {{ required "cnpg.import.host is required" $c.import.host | quote }}
         user: {{ $c.import.user | quote }}
         dbname: {{ $c.import.database | quote }}
         sslmode: disable
       password:
-        name: {{ required "cnpg.import.passwordSecret.name fehlt" $c.import.passwordSecret.name | quote }}
-        key: {{ required "cnpg.import.passwordSecret.key fehlt" $c.import.passwordSecret.key | quote }}
+        name: {{ required "cnpg.import.passwordSecret.name is required" $c.import.passwordSecret.name | quote }}
+        key: {{ required "cnpg.import.passwordSecret.key is required" $c.import.passwordSecret.key | quote }}
   {{- end }}
 {{- end }}

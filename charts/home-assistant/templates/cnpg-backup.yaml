@@ -1,8 +1,8 @@
 {{- /*
-  Kontinuierliche Sicherung (Base-Backup + WAL) des CNPG-Clusters über das Barman-Cloud-Plugin,
-  Der Bucket muss existieren; die Zugangsdaten liegen in einem
-  Secret, das NICHT aus dem Chart kommt (nie in Git). Unterordner im Bucket = serverName am
-  Cluster (= cnpg.name). `configuration.serverName` bleibt leer (upstream nur API-Kompatibilität).
+  Continuous backup (base backup + WAL) of the CNPG cluster via the Barman Cloud plugin.
+  The bucket must exist; the credentials live in a Secret that does NOT come from this chart
+  (never in Git). Folder in the bucket = serverName of the cluster (= cnpg.name).
+  `configuration.serverName` stays empty (upstream keeps it for API compatibility only).
 */ -}}
 {{- if and .Values.cnpg.enabled .Values.cnpg.backup.enabled }}
 {{- $c := .Values.cnpg }}
@@ -14,11 +14,11 @@ metadata:
 spec:
   retentionPolicy: {{ $c.backup.retentionPolicy | quote }}
   configuration:
-    destinationPath: {{ required "cnpg.backup.destinationPath fehlt" $c.backup.destinationPath | quote }}
-    endpointURL: {{ required "cnpg.backup.endpointURL fehlt" $c.backup.endpointURL | quote }}
+    destinationPath: {{ required "cnpg.backup.destinationPath is required" $c.backup.destinationPath | quote }}
+    endpointURL: {{ required "cnpg.backup.endpointURL is required" $c.backup.endpointURL | quote }}
     s3Credentials:
       accessKeyId:
-        name: {{ required "cnpg.backup.credentialsSecret fehlt" $c.backup.credentialsSecret | quote }}
+        name: {{ required "cnpg.backup.credentialsSecret is required" $c.backup.credentialsSecret | quote }}
         key: {{ $c.backup.accessKeyIdKey | quote }}
       secretAccessKey:
         name: {{ $c.backup.credentialsSecret | quote }}
@@ -34,7 +34,7 @@ metadata:
   name: {{ $c.name }}-daily
   namespace: {{ .Release.Namespace }}
 spec:
-  # 6-Feld-Cron (mit Sekunden!), UTC.
+  # 6-field cron (with seconds!), UTC.
   schedule: {{ $c.backup.schedule | quote }}
   backupOwnerReference: self
   immediate: true
