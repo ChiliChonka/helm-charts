@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "helm"
+    directories:
+      - "/charts/jellyfin"
+      - "/charts/home-assistant"
+      - "/charts/paperless-ngx"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "webserver.fullname" . }}
+  labels:
+    {{- include "webserver.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "webserver.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "webserver.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          envFrom:
+            {{- with .Values.adminCredentialsSecret }}
+            - secretRef:
+                name: {{ . | quote }}
+            {{- end }}
+            - secretRef:
+                name: {{ include "webserver.fullname" . }}-db
+            - configMapRef:
+                name: {{ include "webserver.fullname" . }}-configuration
+          env:
+            {{- /*
+              Zugangsdaten aus Secrets der Operatoren. `env` hat Vorrang vor
+              `envFrom`, überschreibt also PAPERLESS_DBUSER/-DBPASS aus dem Secret `-db`.
+              REDIS_PASSWORD steht VOR PAPERLESS_REDIS, damit `$(REDIS_PASSWORD)` in
+              paperlessVars.PAPERLESS_REDIS_OVERWRITE aufgelöst wird (Kubernetes löst nur
+              Variablen auf, die in der Liste davor stehen).
+            */}}
+            - name: PAPERLESS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "webserver.fullname" . }}-secret-key
+                  key: secret-key
+            {{- with .Values.dbCredentialsSecret }}
+            - name: PAPERLESS_DBUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .usernameKey | default "username" }}
+            - name: PAPERLESS_DBPASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .passwordKey | default "password" }}
+            {{- end }}
+            {{- with .Values.redisPasswordSecret }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key | default "password" }}
+            {{- end }}
+            - name: PAPERLESS_REDIS
+              value: {{ include "paperless.redis" . | quote }}
+            - name: PAPERLESS_DBHOST
+              value: {{ include "paperless.dbhost" . | quote }}
+            - name: PAPERLESS_TIKA_ENDPOINT
+              value: {{ include "paperless.tikaEndpoint" . | quote }}
+            - name: PAPERLESS_TIKA_GOTENBERG_ENDPOINT
+              value: {{ include "paperless.tikaGotenbergEndpoint" . | quote }}
+            {{- with .Values.envs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.startupProbe }}
+          {{- /*
+            Solange er nicht bestanden ist, ruhen Liveness und Readiness. Nötig, weil paperless
+            Migrationen VOR dem Webserver ausführt; v3 hasht dabei alle Dateien neu.
+          */}}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      initContainers:
+      - name: wait-for-services-up-and-running
+        # Fester Tag + Digest: vorher ohne Tag = `latest`. 0.25.2 = der bis dahin laufende Digest.
+        image: docker.io/powerman/dockerize:0.25.2@sha256:ffbc7a88b04f83e911145b1dc7010b4c3c9c5420cc6b30ca1763e6aeb245bcd1
+        args:
+          - -timeout
+          - 90s
+          - -wait
+          - tcp://{{ include "paperless.redisReadinessCheck" . }}
+          - -wait
+          - tcp://{{ include "paperless.dbhostReadinessCheck" . }}
+          - -wait
+          - tcp://{{ include "paperless.tikaEndpointReadinessCheck" . }}
+          - -wait
+          - tcp://{{ include "paperless.tikaGotenbergEndpointReadinessCheck" . }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

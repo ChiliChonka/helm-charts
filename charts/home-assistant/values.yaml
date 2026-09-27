@@ -1,0 +1,120 @@
+# Optional: Konfiguration (und Frigate-Aufnahmen) von einer bestehenden NFS-Freigabe. Dann legt
+# das Chart ein statisches PersistentVolume (Retain) samt Claim an, an den sich das StatefulSet
+# des Subcharts bindet. Ohne NFS: `home-assistant.persistence` mit einer StorageClass.
+nfs:
+  enabled: false
+  server: ""          # Pflicht bei nfs.enabled, z. B. 192.0.2.10
+  path: ""            # z. B. /export/home-assistant/config
+  capacity: 100Gi
+  accessMode: ReadWriteOnce
+  mountOptions:
+    - vers=3
+    - proto=tcp
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - timeo=600
+  # Aufnahmen einer Frigate-Installation lesend einbinden (dazu additionalVolumes/-Mounts im
+  # Subchart setzen, siehe README).
+  frigate:
+    enabled: false
+    server: ""
+    path: ""
+    capacity: 1Ti
+    accessMode: ReadOnlyMany
+    mountOptions:
+      - vers=3
+      - proto=tcp
+      - rsize=1048576
+      - wsize=1048576
+      - hard
+      - timeo=600
+
+nameOverride: "home-assistant"
+fullnameOverride: "home-assistant"
+
+# Subchart: Home Assistant (pajikos/home-assistant-helm-chart)
+home-assistant:
+  nameOverride: "home-assistant"
+  fullnameOverride: "home-assistant"
+  env:
+    - name: TZ
+      value: UTC
+    # Mit cnpg.enabled: Recorder-Datenbank aus dem von CNPG erzeugten Secret, dazu in
+    # configuration.yaml `recorder: db_url: !env_var HA_RECORDER_DB_URL` (README).
+    # - name: HA_RECORDER_DB_URL
+    #   valueFrom: {secretKeyRef: {name: home-assistant-db-app, key: uri}}
+
+  serviceAccount:
+    create: false
+
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: "OnRootMismatch"
+
+  # Erreichbar über die HTTPRoute unten, der Ingress bleibt aus. `external: true` trotzdem: Nur
+  # damit legt das Subchart `http-storage.json` an, aus der das Init-Skript bei einer
+  # NEUINSTALLATION die vertrauten Proxys einrichtet (ohne sie lehnt Home Assistant Anfragen über
+  # ein Gateway mit 400 ab).
+  ingress:
+    external: true
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  controller:
+    type: StatefulSet
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  configuration:
+    enabled: true
+    forceInit: false
+    trusted_proxies:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 127.0.0.0/8
+
+# HTTPRoute am Gateway (Gateway API, templates/httproute.yaml). Aus per Default; `sectionName`
+# (der HTTPS-Listener) ist Pflicht.
+httpRoute:
+  enabled: false
+  parentRef: {}
+  routes: []
+  #   - name: home-assistant
+  #     hostnames: [home-assistant.example.com]
+  #     rules:
+  #       - backendRefs: [{name: home-assistant, port: 8080}]
+  #         matches: [{path: {type: PathPrefix, value: /}}]
+
+# Recorder-Datenbank (History, Langzeitstatistik) über CNPG statt SQLite — setzt den
+# CNPG-Operator voraus (docs/operators.md). Backups über das Barman-Cloud-Plugin nach S3.
+cnpg:
+  enabled: false
+  name: home-assistant-db
+  image: ""           # fester Tag, z. B. ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  instances: 1
+  storageSize: 5Gi
+  database: homeassistant
+  owner: homeassistant
+  resources: {}
+  parameters: {}
+  backup:
+    enabled: false
+    destinationPath: ""       # z. B. s3://home-assistant-db-backup
+    endpointURL: ""           # beliebiges S3
+    credentialsSecret: ""     # Secret mit den beiden Schlüsseln unten, von Hand oder per Operator
+    accessKeyIdKey: ACCESS_KEY_ID
+    secretAccessKeyKey: SECRET_ACCESS_KEY
+    retentionPolicy: "30d"
+    schedule: "0 0 2 * * *"   # 6 Felder, mit Sekunden

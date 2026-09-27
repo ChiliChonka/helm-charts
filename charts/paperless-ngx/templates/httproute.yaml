@@ -1,0 +1,37 @@
+{{- /*
+  HTTPRoute(s) am geteilten Envoy-Gateway (Gateway API).
+
+  Die App dockt am Wildcard-Listener ihrer Domain an (Gateway-API: ein Gateway mit Wildcard-Listener je Domain): nur die Route, kein Listener, kein Zertifikat, kein ReferenceGrant.
+
+  - sectionName ist Pflicht: Ohne ihn hinge die Route auch am HTTP-Listener und umginge die
+    Umleitung auf https.
+  - Envoy nimmt ohne `timeouts.request` 15 s; lange Anfragen (Uploads, Streams) brauchen einen
+    eigenen Wert in der Regel.
+  - `rules` stehen wörtlich in den Werten (matches, backendRefs, timeouts) — so, wie sie die Route
+    braucht, ohne Übersetzung durch die Vorlage.
+*/ -}}
+{{- if .Values.httpRoute.enabled }}
+{{- range $route := .Values.httpRoute.routes }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ required "httpRoute.routes[].name fehlt" $route.name }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  parentRefs:
+    {{- /* Liste httpRoute.parentRefs (z. B. übergangsweise an zwei Gateways), sonst die
+         Einzelangabe httpRoute.parentRef wie bisher. */}}
+    {{- range $p := ($.Values.httpRoute.parentRefs | default (list $.Values.httpRoute.parentRef)) }}
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ required "httpRoute.parentRef(s).name fehlt" $p.name }}
+      namespace: {{ required "httpRoute.parentRef(s).namespace fehlt" $p.namespace }}
+      sectionName: {{ required "httpRoute.parentRef(s).sectionName fehlt (sonst umgeht die Route die Umleitung auf https)" $p.sectionName }}
+    {{- end }}
+  hostnames:
+    {{- toYaml (required "httpRoute.routes[].hostnames fehlt" $route.hostnames) | nindent 4 }}
+  rules:
+    {{- toYaml (required "httpRoute.routes[].rules fehlt" $route.rules) | nindent 4 }}
+{{- end }}
+{{- end }}

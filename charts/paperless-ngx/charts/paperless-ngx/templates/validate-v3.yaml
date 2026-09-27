@@ -1,0 +1,28 @@
+{{- /*
+  paperless-ngx 3: Diese Variablen gibt es nicht mehr oder sie sind abgelöst
+  (docs/migration-v3.md upstream). Die ConfigMap-Vorlage rendert sie nicht mehr; ein gesetzter
+  Wert wäre also still wirkungslos — deshalb bricht der Render ab.
+  PAPERLESS_SECRET_KEY landete früher in der ConfigMap; er kommt jetzt aus dem Secret
+  `<fullname>-secret-key` (templates/secret-key.yaml).
+*/ -}}
+{{- $replaced := dict
+  "PAPERLESS_CONSUMER_POLLING" "PAPERLESS_CONSUMER_POLLING_INTERVAL"
+  "PAPERLESS_CONSUMER_INOTIFY_DELAY" "PAPERLESS_CONSUMER_STABILITY_DELAY"
+  "PAPERLESS_CONSUMER_POLLING_DELAY" "PAPERLESS_CONSUMER_STABILITY_DELAY"
+  "PAPERLESS_CONSUMER_POLLING_RETRY_COUNT" "nichts (entfällt)"
+  "PAPERLESS_CONSUMER_BARCODE_SCANNER" "nichts (nur noch zxing)"
+  "PAPERLESS_OCR_SKIP_ARCHIVE_FILE" "PAPERLESS_ARCHIVE_FILE_GENERATION"
+  "PAPERLESS_DBSSLMODE" "PAPERLESS_DB_OPTIONS"
+  "PAPERLESS_DBSSLROOTCERT" "PAPERLESS_DB_OPTIONS"
+  "PAPERLESS_DBSSLCERT" "PAPERLESS_DB_OPTIONS"
+  "PAPERLESS_DBSSLKEY" "PAPERLESS_DB_OPTIONS"
+  "PAPERLESS_DB_TIMEOUT" "PAPERLESS_DB_OPTIONS"
+  "PAPERLESS_SECRET_KEY" "das vom Chart erzeugte Secret (nie in Values)" }}
+{{- range $old, $new := $replaced }}
+{{- if index $.Values.paperlessVars $old }}
+{{- fail (printf "%s is not supported by paperless-ngx 3 in this chart; use %s." $old $new) }}
+{{- end }}
+{{- end }}
+{{- if has (index .Values.paperlessVars "PAPERLESS_OCR_MODE") (list "skip" "skip_noarchive") }}
+{{- fail "PAPERLESS_OCR_MODE skip/skip_noarchive were removed in paperless-ngx 3; use auto plus PAPERLESS_ARCHIVE_FILE_GENERATION." }}
+{{- end }}

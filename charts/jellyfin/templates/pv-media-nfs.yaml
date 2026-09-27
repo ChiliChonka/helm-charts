@@ -1,0 +1,17 @@
+{{- if .Values.jellyfin.nfs.media.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "jellyfin-helm-chart.fullname" . }}-nfs-media-pv
+spec:
+  capacity:
+    storage: {{ .Values.jellyfin.nfs.media.size | default "100Gi" }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  volumeMode: Filesystem
+  nfs:
+    server: {{ required "jellyfin.nfs.server fehlt (NFS eingeschaltet)" .Values.jellyfin.nfs.server }}
+    path: {{ required "jellyfin.nfs.media.path fehlt" .Values.jellyfin.nfs.media.path }}
+{{- end }}

@@ -1,0 +1,22 @@
+{{- if .Values.nfs.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "home-assistant.fullname" . }}-home-assistant-0
+  labels:
+    {{- include "home-assistant.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.nfs.capacity }}
+  accessModes:
+    - {{ .Values.nfs.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+{{- range .Values.nfs.mountOptions }}
+    - {{ . }}
+{{- end }}
+  nfs:
+    server: {{ required "nfs.server fehlt (nfs.enabled)" .Values.nfs.server }}
+    path: {{ required "nfs.path fehlt (nfs.enabled)" .Values.nfs.path }}
+{{- end }}

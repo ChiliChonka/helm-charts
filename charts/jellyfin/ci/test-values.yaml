@@ -1,0 +1,20 @@
+# Erfundene Werte für die Chart-Prüfung (tools/check_chart.py, CI) — kein echter Betrieb.
+jellyfin:
+  nfs:
+    enabled: true
+    server: 192.0.2.10
+    media: {enabled: true, path: /export/jellyfin/media}
+    config: {enabled: true, path: /export/jellyfin/config}
+  persistence:
+    config: {enabled: true, existingClaim: jellyfin-config}
+    media: {enabled: true, existingClaim: jellyfin-media}
+httpRoute:
+  enabled: true
+  parentRef: {name: example-gateway, namespace: gateway-system, sectionName: https}
+  routes:
+    - name: jellyfin
+      hostnames: [jellyfin.example.com]
+      rules:
+        - backendRefs: [{name: jellyfin, port: 8096}]
+          matches: [{path: {type: PathPrefix, value: /}}]
+          timeouts: {request: 10h0m0s}

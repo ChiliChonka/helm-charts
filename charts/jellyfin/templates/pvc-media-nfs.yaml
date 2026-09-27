@@ -1,0 +1,14 @@
+{{- if .Values.jellyfin.nfs.media.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.jellyfin.persistence.media.existingClaim | default (printf "%s-nfs-pvc" (include "jellyfin-helm-chart.fullname" .)) }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.jellyfin.nfs.media.size | default "100Gi" }}
+  storageClassName: ""
+  volumeName: {{ include "jellyfin-helm-chart.fullname" . }}-nfs-media-pv
+{{- end }}

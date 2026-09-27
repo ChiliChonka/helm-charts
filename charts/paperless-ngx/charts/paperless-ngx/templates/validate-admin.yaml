@@ -1,0 +1,3 @@
+{{- if or .Values.paperlessVars.PAPERLESS_ADMIN_USER .Values.paperlessVars.PAPERLESS_ADMIN_PASSWORD .Values.paperlessVars.PAPERLESS_ADMIN_MAIL }}
+{{- fail "Inline admin credentials are forbidden. Clear PAPERLESS_ADMIN_USER/PASSWORD/MAIL and use adminCredentialsSecret for an external bootstrap Secret." }}
+{{- end }}

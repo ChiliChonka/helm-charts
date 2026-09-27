@@ -1,0 +1,16 @@
+{{- if .Values.nfs.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "home-assistant.fullname" . }}-home-assistant-0
+  labels:
+    {{- include "home-assistant.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.nfs.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.nfs.capacity }}
+  storageClassName: ""
+  volumeName: {{ include "home-assistant.fullname" . }}-home-assistant-0
+{{- end }}

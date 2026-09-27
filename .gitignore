@@ -1,0 +1,3 @@
+# Abhängigkeiten werden aus Chart.lock geladen (helm dependency build), nicht eingecheckt.
+charts/*/charts/*.tgz
+__pycache__/

@@ -1,0 +1,23 @@
+# Erfundene Werte für die Chart-Prüfung (CI) — kein echter Betrieb.
+nfs:
+  enabled: true
+  server: 192.0.2.10
+  path: /export/home-assistant/config
+  frigate: {enabled: true, server: 192.0.2.10, path: /export/frigate/media}
+httpRoute:
+  enabled: true
+  parentRef: {name: example-gateway, namespace: gateway-system, sectionName: https}
+  routes:
+    - name: home-assistant
+      hostnames: [home-assistant.example.com]
+      rules:
+        - backendRefs: [{name: home-assistant, port: 8080}]
+          matches: [{path: {type: PathPrefix, value: /}}]
+cnpg:
+  enabled: true
+  image: ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  backup:
+    enabled: true
+    destinationPath: s3://example-backup
+    endpointURL: http://s3.example.svc:9000
+    credentialsSecret: example-backup-s3

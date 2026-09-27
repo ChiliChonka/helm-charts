@@ -1,0 +1,300 @@
+replicaCount: 1
+# Deployment-Strategie. Leer = Kubernetes-Default (RollingUpdate). Fuer eine Replik auf gemeinsamem
+# NFS: {type: Recreate, rollingUpdate: null} - sonst laufen beim Update zwei Instanzen gleichzeitig.
+strategy: {}
+
+image:
+  repository: ghcr.io/paperless-ngx/paperless-ngx
+  # This sets the pull policy for images.
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+# This is for the secretes for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+
+# This is for setting Kubernetes Annotations to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/ 
+podAnnotations: {}
+# This is for setting Kubernetes Labels to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+#  runAsUser: 1024
+#  runAsGroup: 1000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+# This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+service:
+  # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+  type: ClusterIP
+  # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
+  port: 8000
+
+# Kein Ingress mehr: Erreichbar über die HTTPRoute des Wrapper-Charts am Envoy-Gateway
+# (ingress-nginx seit 2026-09-22 abgebaut). Vorlage und Werte entfernt — der Default war
+# `enabled: true` und hätte ohne Override einen Ingress angelegt.
+
+resources:
+  limits:
+    cpu: 2
+    memory: 2048Mi
+  requests:
+    cpu: 1
+    memory: 1024Mi
+
+# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+# Optional. Ohne Wert kein startupProbe (Verhalten wie bisher).
+startupProbe: {}
+
+livenessProbe:
+  initialDelaySeconds: 45
+  periodSeconds: 30
+  successThreshold: 1
+  timeoutSeconds: 5
+  httpGet:
+    path: /
+    port: http
+readinessProbe:
+  initialDelaySeconds: 45
+  periodSeconds: 30
+  successThreshold: 1
+  timeoutSeconds: 5
+  httpGet:
+    path: /
+    port: http
+
+
+# Additional volumes on the output Deployment definition.
+volumes:
+  - name: paperless-consume
+    emptyDir: {}
+  - name: paperless-data
+    emptyDir: {}
+  - name: paperless-media
+    emptyDir: {}
+  - name: paperless-export
+    emptyDir: {}
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+  - name: paperless-consume
+    mountPath: /usr/src/paperless/consume
+  - name: paperless-data
+    mountPath: /usr/src/paperless/data
+  - name: paperless-media
+    mountPath: /usr/src/paperless/media
+  - name: paperless-export
+    mountPath: /usr/src/paperless/export
+
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+paperlessVars:
+  PAPERLESS_ACCOUNT_ALLOW_SIGNUPS: ""
+  PAPERLESS_ACCOUNT_DEFAULT_HTTP_PROTOCOL: ""
+  PAPERLESS_ACCOUNT_EMAIL_VERIFICATION: ""
+  PAPERLESS_ACCOUNT_SESSION_REMEMBER: ""
+  PAPERLESS_ADMIN_MAIL: ""
+  PAPERLESS_ADMIN_PASSWORD: ""
+  PAPERLESS_ADMIN_USER: ""
+  PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER: ""
+  PAPERLESS_ALLAUTH_TRUSTED_PROXY_COUNT: ""
+  PAPERLESS_ALLOWED_HOSTS: ""
+  PAPERLESS_APP_LOGO: ""
+  PAPERLESS_APPS: ""
+  PAPERLESS_APP_TITLE: ""
+  PAPERLESS_ARCHIVE_FILE_GENERATION: ""
+  PAPERLESS_AUDIT_LOG_ENABLED: ""
+  PAPERLESS_AUTO_LOGIN_USERNAME: ""
+  PAPERLESS_BIND_ADDR: ""
+  PAPERLESS_CONSUMER_ASN_BARCODE_PREFIX: ""
+  PAPERLESS_CONSUMER_BARCODE_DPI: ""
+  PAPERLESS_CONSUMER_BARCODE_MAX_PAGES: ""
+  PAPERLESS_CONSUMER_BARCODE_RETAIN_SPLIT_PAGES: ""
+  PAPERLESS_CONSUMER_BARCODE_STRING: ""
+  PAPERLESS_CONSUMER_BARCODE_TIFF_SUPPORT: ""
+  PAPERLESS_CONSUMER_BARCODE_UPSCALE: ""
+  PAPERLESS_CONSUMER_COLLATE_DOUBLE_SIDED_SUBDIR_NAME: ""
+  PAPERLESS_CONSUMER_COLLATE_DOUBLE_SIDED_TIFF_SUPPORT: ""
+  PAPERLESS_CONSUMER_DELETE_DUPLICATES: ""
+  PAPERLESS_CONSUMER_ENABLE_ASN_BARCODE: ""
+  PAPERLESS_CONSUMER_ENABLE_BARCODES: ""
+  PAPERLESS_CONSUMER_ENABLE_COLLATE_DOUBLE_SIDED: ""
+  PAPERLESS_CONSUMER_ENABLE_TAG_BARCODE: ""
+  PAPERLESS_CONSUMER_IGNORE_DIRS: ""
+  PAPERLESS_CONSUMER_IGNORE_PATTERNS: ""
+  PAPERLESS_CONSUMER_POLLING_INTERVAL: ""
+  PAPERLESS_CONSUMER_RECURSIVE: ""
+  PAPERLESS_CONSUMER_STABILITY_DELAY: ""
+  PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: ""
+  PAPERLESS_CONSUMER_TAG_BARCODE_MAPPING: ""
+  PAPERLESS_CONSUMPTION_DIR: ""
+  PAPERLESS_CONVERT_BINARY: ""
+  PAPERLESS_CONVERT_MEMORY_LIMIT: ""
+  PAPERLESS_CONVERT_TMPDIR: ""
+  PAPERLESS_COOKIE_PREFIX: ""
+  PAPERLESS_CORS_ALLOWED_HOSTS: ""
+  PAPERLESS_CSRF_TRUSTED_ORIGINS: ""
+  PAPERLESS_DATA_DIR: ""
+  PAPERLESS_DATE_ORDER: ""
+  PAPERLESS_DBENGINE: "postgresql"
+  PAPERLESS_DBHOST_OVERWRITE: ""
+  PAPERLESS_DBHOST: "postgresql"
+  PAPERLESS_DBNAME: "paperless"
+  PAPERLESS_DBPASS: ""
+  PAPERLESS_DBPORT: "5432"
+  PAPERLESS_DBUSER: ""
+  PAPERLESS_DB_OPTIONS: ""
+  PAPERLESS_DISABLE_REGULAR_LOGIN: ""
+  PAPERLESS_EMAIL_CERTIFICATE_LOCATION: ""
+  PAPERLESS_EMAIL_FROM: ""
+  PAPERLESS_EMAIL_GNUPG_HOME: ""
+  PAPERLESS_EMAIL_HOST: ""
+  PAPERLESS_EMAIL_HOST_PASSWORD: ""
+  PAPERLESS_EMAIL_HOST_USER: ""
+  PAPERLESS_EMAIL_PORT: ""
+  PAPERLESS_EMAIL_TASK_CRON: ""
+  PAPERLESS_EMAIL_USE_SSL: ""
+  PAPERLESS_EMAIL_USE_TLS: ""
+  PAPERLESS_EMPTY_TRASH_DELAY: ""
+  PAPERLESS_EMPTY_TRASH_DIR: ""
+  PAPERLESS_EMPTY_TRASH_TASK_CRON: ""
+  PAPERLESS_ENABLE_COMPRESSION: ""
+  PAPERLESS_ENABLE_FLOWER: ""
+  PAPERLESS_ENABLE_GPG_DECRYPTOR: ""
+  PAPERLESS_ENABLE_HTTP_REMOTE_USER: ""
+  PAPERLESS_ENABLE_HTTP_REMOTE_USER_API: ""
+  PAPERLESS_ENABLE_NLTK: ""
+  PAPERLESS_ENABLE_UPDATE_CHECK: ""
+  PAPERLESS_FILENAME_DATE_ORDER: ""
+  PAPERLESS_FILENAME_FORMAT: ""
+  PAPERLESS_FILENAME_FORMAT_REMOVE_NONE: ""
+  PAPERLESS_FORCE_SCRIPT_NAME: ""
+  PAPERLESS_GMAIL_OAUTH_CLIENT_ID: ""
+  PAPERLESS_GMAIL_OAUTH_CLIENT_SECRET: ""
+  PAPERLESS_GS_BINARY: ""
+  PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME: ""
+  PAPERLESS_IGNORE_DATES: ""
+  PAPERLESS_INDEX_TASK_CRON: ""
+  PAPERLESS_LOGGING_DIR: ""
+  PAPERLESS_LOGOUT_REDIRECT_URL: ""
+  PAPERLESS_LOGROTATE_MAX_BACKUPS: ""
+  PAPERLESS_LOGROTATE_MAX_SIZE: ""
+  PAPERLESS_MAX_IMAGE_PIXELS: ""
+  PAPERLESS_MEDIA_ROOT: ""
+  PAPERLESS_MODEL_FILE: ""
+  PAPERLESS_NLTK_DIR: ""
+  PAPERLESS_NUMBER_OF_SUGGESTED_DATES: ""
+  PAPERLESS_OAUTH_CALLBACK_BASE_URL: ""
+  PAPERLESS_OCR_CLEAN: ""
+  PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY: ""
+  PAPERLESS_OCR_DESKEW: ""
+  PAPERLESS_OCR_IMAGE_DPI: ""
+  PAPERLESS_OCR_LANGUAGE: ""
+  PAPERLESS_OCR_LANGUAGES: ""
+  PAPERLESS_OCR_MAX_IMAGE_PIXELS: ""
+  PAPERLESS_OCR_MODE: ""
+  PAPERLESS_OCR_OUTPUT_TYPE: ""
+  PAPERLESS_OCR_PAGES: ""
+  PAPERLESS_OCR_ROTATE_PAGES: ""
+  PAPERLESS_OCR_ROTATE_PAGES_THRESHOLD: ""
+  PAPERLESS_OCR_USER_ARGS: ""
+  PAPERLESS_OUTLOOK_OAUTH_CLIENT_ID: ""
+  PAPERLESS_OUTLOOK_OAUTH_CLIENT_SECRET: ""
+  PAPERLESS_PORT: ""
+  PAPERLESS_POST_CONSUME_SCRIPT: ""
+  PAPERLESS_PRE_CONSUME_SCRIPT: ""
+  PAPERLESS_PROXY_SSL_HEADER: ""
+  PAPERLESS_REDIRECT_LOGIN_TO_SSO: ""
+  PAPERLESS_REDIS_OVERWRITE: ""
+  PAPERLESS_REDIS_HOST: "redis-headless"
+  PAPERLESS_REDIS_PORT: "6379"
+  PAPERLESS_REDIS_PREFIX: ""
+  PAPERLESS_SANITY_TASK_CRON: ""
+  PAPERLESS_SESSION_COOKIE_AGE: ""
+  PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS: ""
+  PAPERLESS_SOCIALACCOUNT_PROVIDERS: ""
+  PAPERLESS_SOCIAL_AUTO_SIGNUP: ""
+  PAPERLESS_STATICDIR: ""
+  PAPERLESS_STATIC_URL: ""
+  PAPERLESS_SUPERVISORD_WORKING_DIR: ""
+  PAPERLESS_TASK_WORKERS: "3"
+  PAPERLESS_THREADS_PER_WORKER: "4"
+  PAPERLESS_THUMBNAIL_FONT_NAME: ""
+  PAPERLESS_TIKA_ENABLED: "1"
+  PAPERLESS_TIKA_ENDPOINT_OVERWRITE: ""
+  PAPERLESS_TIKA_ENDPOINT: "tika"
+  PAPERLESS_TIKA_ENDPOINT_PROTOCOL: "http"
+  PAPERLESS_TIKA_ENDPOINT_PORT: "9998"
+  PAPERLESS_TIKA_GOTENBERG_ENDPOINT_OVERWRITE: ""
+  PAPERLESS_TIKA_GOTENBERG_ENDPOINT: "gotenberg"
+  PAPERLESS_TIKA_GOTENBERG_ENDPOINT_PROTOCOL: "http"
+  PAPERLESS_TIKA_GOTENBERG_ENDPOINT_PORT: "80"
+  PAPERLESS_TIME_ZONE: ""
+  PAPERLESS_TRAIN_TASK_CRON: ""
+  PAPERLESS_TRUSTED_PROXIES: ""
+  PAPERLESS_URL: ""
+  PAPERLESS_USE_X_FORWARD_HOST: ""
+  PAPERLESS_USE_X_FORWARD_PORT: ""
+  PAPERLESS_WEBSERVER_WORKERS: "4"
+  PAPERLESS_WORKER_TIMEOUT: ""
+
+envs: []
+
+# Zugangsdaten aus Secrets der Operatoren statt aus paperlessVars.
+# dbCredentialsSecret: { name: paperless-db-app, usernameKey: username, passwordKey: password }
+dbCredentialsSecret: {}
+# redisPasswordSecret: { name: paperless-redis-auth, key: password } -- dazu
+# paperlessVars.PAPERLESS_REDIS_OVERWRITE: "redis://:$(REDIS_PASSWORD)@<host>:6379"
+redisPasswordSecret: {}
+#  - name: PAPERLESS_CONSUMPTION_DIR
+#    value: "/consume"
+
+pvs: []
+
+pvcs: []
+#  - name: pvc-consume
+#    storageClassName: ""
+#    accessModes:
+#      - ReadWriteOnce
+#    storage: 200Mi
+#    pvName: ""
+#  - name: pvc-data
+#    storageClassName: ""
+#    accessModes:
+#      - ReadWriteOnce
+#    storage: 5Gi
+#    pvName: ""
+#  - name: pvc-media
+#    storageClassName: ""
+#    accessModes:
+#      - ReadWriteOnce
+#    storage: 5Gi
+#    pvName: ""
+#  - name: pvc-export
+#    storageClassName: ""
+#    accessModes:
+#      - ReadWriteOnce
+#    storage: 5Gi
+#    pvName: ""
+
+# Optional external bootstrap Secret; leave empty after initial setup.
+# Keys: PAPERLESS_ADMIN_USER, PAPERLESS_ADMIN_PASSWORD, PAPERLESS_ADMIN_MAIL.
+adminCredentialsSecret: ""

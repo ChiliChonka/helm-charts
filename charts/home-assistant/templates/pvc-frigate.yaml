@@ -1,0 +1,16 @@
+{{- if .Values.nfs.frigate.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "home-assistant.fullname" . }}-frigate
+  labels:
+    {{- include "home-assistant.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.nfs.frigate.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.nfs.frigate.capacity }}
+  storageClassName: ""
+  volumeName: {{ include "home-assistant.fullname" . }}-frigate
+{{- end }}

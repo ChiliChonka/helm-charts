@@ -1,0 +1,22 @@
+{{- if .Values.nfs.frigate.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "home-assistant.fullname" . }}-frigate
+  labels:
+    {{- include "home-assistant.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.nfs.frigate.capacity }}
+  accessModes:
+    - {{ .Values.nfs.frigate.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+{{- range .Values.nfs.frigate.mountOptions }}
+    - {{ . }}
+{{- end }}
+  nfs:
+    server: {{ required "nfs.frigate.server fehlt (nfs.frigate.enabled)" .Values.nfs.frigate.server }}
+    path: {{ required "nfs.frigate.path fehlt (nfs.frigate.enabled)" .Values.nfs.frigate.path }}
+{{- end }}

@@ -1,0 +1,12 @@
+dependencies:
+- name: tika
+  repository: https://apache.jfrog.io/artifactory/tika
+  version: 3.2.2
+- name: gotenberg
+  repository: https://maikumori.github.io/helm-charts
+  version: 1.21.0
+- name: paperless-ngx
+  repository: ""
+  version: 0.1.6
+digest: sha256:1ed62513f0970561db7b2b493f670c48ce9b21ab859a6d862d8fbd630fe04c81
+generated: "2026-09-26T23:46:16.873113264+02:00"

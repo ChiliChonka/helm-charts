@@ -1,0 +1,69 @@
+jellyfin:
+
+  # Optional: Medien und Konfiguration von einer bestehenden NFS-Freigabe. Dann legt das Chart je
+  # ein PersistentVolume (Retain) und einen passenden Claim an; `persistence.*.existingClaim`
+  # benennt den Claim (siehe README, Beispiel). Ohne NFS nimmt das Upstream-Chart seine Default-
+  # Persistenz über die StorageClass des Clusters.
+  nfs:
+    enabled: false
+    server: ""          # Pflicht, wenn ein Volume eingeschaltet ist, z. B. 192.0.2.10
+    media:
+      enabled: false
+      path: ""          # z. B. /export/jellyfin/media
+      size: 100Gi
+    config:
+      enabled: false
+      path: ""          # z. B. /export/jellyfin/config
+      size: 5Gi
+
+  serviceAccount:
+    create: false
+    automount: false
+
+  # Fester Tag statt dem Default des Upstream-Charts. Image-Tag und `appVersion` in Chart.yaml
+  # laufen gemeinsam (tools/check_chart.py prüft das).
+  image:
+    tag: "12.1"
+
+  # Reserve für gelegentliches Transcoding. Bewusst KEINE CPU-Grenze: Jellyfin transkodiert in
+  # Software, ein 1080p-Transcode kann mehr als 2 Kerne brauchen — an einer Grenze würde gedrosselt,
+  # das Video ruckelt. Die Anfrage reserviert den Grundbedarf; die Speichergrenze schützt den Knoten.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+  # Recreate statt RollingUpdate: Beim Rolling Update startet der neue Pod NEBEN dem alten, zwei
+  # Jellyfin-Instanzen arbeiten dann auf derselben Datenbank. `rollingUpdate: null`, weil der
+  # API-Server dort sonst Standardwerte einträgt, die mit Recreate unzulässig sind.
+  deploymentStrategy:
+    type: Recreate
+    rollingUpdate: null
+
+  # Checks mit Reserve: 1 s Timeout ist unter Last (Transkodieren, Bibliotheks-Scan) zu knapp.
+  # Startup: 10 Minuten für den ersten Start nach einem Update mit Datenbank-Umbau.
+  livenessProbe:
+    timeoutSeconds: 5
+    failureThreshold: 5
+  readinessProbe:
+    timeoutSeconds: 5
+  startupProbe:
+    failureThreshold: 60
+
+# HTTPRoute am Gateway (Gateway API, templates/httproute.yaml). Aus per Default. `sectionName` ist
+# Pflicht (der HTTPS-Listener), Streams brauchen einen langen `timeouts.request`.
+httpRoute:
+  enabled: false
+  parentRef: {}
+  #   name: my-gateway
+  #   namespace: gateway-system
+  #   sectionName: https
+  routes: []
+  #   - name: jellyfin
+  #     hostnames: [jellyfin.example.com]
+  #     rules:
+  #       - backendRefs: [{name: jellyfin, port: 8096}]
+  #         matches: [{path: {type: PathPrefix, value: /}}]
+  #         timeouts: {request: 10h0m0s}

@@ -1,0 +1,17 @@
+{{- range .Values.pvcs }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "webserver.labels" $ | nindent 4 }}
+spec:
+  storageClassName: {{ .storageClassName | quote }}
+  accessModes:
+    {{- toYaml .accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .storage }}
+  volumeName: {{ .volumeName }}
+---
+{{- end }}
