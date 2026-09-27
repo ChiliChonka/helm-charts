@@ -11,7 +11,7 @@ dependencies:
     repository: https://apache.jfrog.io/artifactory/tika
     condition: tika.enabled    
   - name: gotenberg
-    version: 1.21.0
+    version: 1.25.0
     repository: https://maikumori.github.io/helm-charts
     condition: gotenberg.enabled    
   # Webserver is the paperless-ngx itself. No repository given, while it's already laying in the charts sub directory.
