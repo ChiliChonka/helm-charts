@@ -1,0 +1,47 @@
+{{- if .Values.cnpg.enabled }}
+{{- $c := .Values.cnpg }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ $c.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  instances: {{ $c.instances }}
+  imageName: {{ required "cnpg.image must include VectorChord and pgvector" $c.image | quote }}
+  enableSuperuserAccess: false
+  storage:
+    size: {{ $c.storageSize }}
+    {{- with $c.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+  {{- with $c.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $c.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  postgresql:
+    shared_preload_libraries: [vchord.so]
+    {{- with $c.parameters }}
+    parameters:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  bootstrap:
+    initdb:
+      database: {{ $c.database | quote }}
+      owner: {{ $c.owner | quote }}
+      # Executed as superuser in the APPLICATION database, only on bootstrap.
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
+        - CREATE EXTENSION IF NOT EXISTS earthdistance CASCADE;
+  {{- if $c.backup.enabled }}
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ $c.name }}-backup-store
+        serverName: {{ $c.name }}
+  {{- end }}
+{{- end }}

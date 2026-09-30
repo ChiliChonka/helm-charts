@@ -1,0 +1,43 @@
+{{- if .Values.redisOperator.enabled }}
+{{- $r := .Values.redisOperator }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $r.name }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  redis-config: |
+    appendonly yes
+    appendfsync everysec
+    maxmemory-policy noeviction
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: {{ $r.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  kubernetesConfig:
+    image: {{ required "redisOperator.image is required" $r.image | quote }}
+    imagePullPolicy: IfNotPresent
+    redisSecret:
+      name: {{ required "redisOperator.existingSecret is required" $r.existingSecret | quote }}
+      key: {{ required "redisOperator.passwordKey is required" $r.passwordKey | quote }}
+    {{- with $r.resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  redisConfig:
+    additionalRedisConfig: {{ $r.name }}-config
+  storage:
+    keepAfterDelete: true
+    volumeClaimTemplate:
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with $r.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $r.storageSize }}
+{{- end }}

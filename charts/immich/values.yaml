@@ -1,0 +1,137 @@
+# Upstream values are nested under immich. Infrastructure resources are opt-in.
+# Defaults reference external services/PVCs; rendering alone is not a complete installation.
+# Never put passwords, OAuth client secrets or S3 keys in values.
+immich:
+  controllers:
+    main:
+      containers:
+        main:
+          image:
+            tag: v3.2.4
+  immich:
+    persistence:
+      library:
+        existingClaim: immich-library
+    # With CNPG, supply an external config Secret (below) or set:
+    # configuration: {backup: {database: {enabled: false}}}
+    # CNPG's app user is not a superuser; use Barman for database backups.
+    # Any config file disables system-settings editing in the Immich UI.
+    configuration: {}
+    # For OAuth, provide an external Secret containing immich-config.yaml.
+    # Its COMPLETE config must include backup.database.enabled: false for CNPG.
+    # configuration: null  # clear any inline config when using an external Secret
+    # configurationKind: Secret
+    # existingConfiguration: immich-config
+  valkey:
+    enabled: false
+  server:
+    controllers:
+      main:
+        replicas: 1
+        strategy: Recreate
+        containers:
+          main:
+            # Keep DB and Redis credentials scoped to the server, not ML.
+            env:
+              TZ: Etc/UTC
+              DB_HOSTNAME: immich-db-rw
+              DB_PORT: "5432"
+              DB_DATABASE_NAME: immich
+              DB_USERNAME:
+                valueFrom:
+                  secretKeyRef: {name: immich-db-app, key: username}
+              DB_PASSWORD:
+                valueFrom:
+                  secretKeyRef: {name: immich-db-app, key: password}
+              DB_VECTOR_EXTENSION: vectorchord
+              REDIS_HOSTNAME: immich-redis
+              REDIS_PORT: "6379"
+              REDIS_PASSWORD:
+                valueFrom:
+                  secretKeyRef: {name: immich-redis-auth, key: password}
+            resources:
+              requests: {cpu: 250m, memory: 1Gi}
+              limits: {memory: 4Gi}
+            probes:
+              liveness:
+                spec: {timeoutSeconds: 5, failureThreshold: 5}
+              readiness:
+                spec: {timeoutSeconds: 5}
+              startup:
+                spec: {timeoutSeconds: 5, failureThreshold: 120}
+  machine-learning:
+    controllers:
+      main:
+        replicas: 1
+        strategy: Recreate
+        containers:
+          main:
+            resources:
+              requests: {cpu: 250m, memory: 1Gi}
+              limits: {memory: 4Gi}
+    persistence:
+      cache:
+        type: persistentVolumeClaim
+        size: 10Gi
+        accessMode: ReadWriteOnce
+        # storageClass: your-block-storage-class
+
+# Claim name is immich.immich.persistence.library.existingClaim.
+# For dynamic NFS use an existing CSI StorageClass with Retain/onDelete: retain.
+library:
+  create: false
+  size: 100Gi
+  accessModes: [ReadWriteMany]
+  storageClass: ""
+  annotations:
+    helm.sh/resource-policy: keep
+
+# New dedicated database; the image MUST include VectorChord + pgvector.
+# If changing name/database, update the server's DB_* and secret references too.
+cnpg:
+  enabled: false
+  name: immich-db
+  image: ghcr.io/tensorchord/cloudnative-vectorchord:17.11-1.1.1
+  instances: 1
+  storageSize: 20Gi
+  storageClass: ""
+  database: immich
+  owner: immich
+  affinity: {}
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {memory: 2Gi}
+  parameters: {}
+  backup:
+    enabled: false
+    destinationPath: ""
+    endpointURL: ""
+    credentialsSecret: ""
+    accessKeyIdKey: ACCESS_KEY_ID
+    secretAccessKeyKey: SECRET_ACCESS_KEY
+    retentionPolicy: "30d"
+    # Six fields, seconds first, UTC.
+    schedule: "0 0 3 * * *"
+
+# OT-CONTAINER-KIT redis-operator; dedicated, authenticated, persistent job queue.
+# If changing name/auth reference, update the server's REDIS_* too.
+redisOperator:
+  enabled: false
+  name: immich-redis
+  image: quay.io/opstree/redis:v7.4.11
+  existingSecret: immich-redis-auth
+  passwordKey: password
+  storageSize: 1Gi
+  storageClass: ""
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 512Mi}
+
+# Envoy/shared Gateway terminates TLS. No separate proxy OAuth: use Immich OIDC.
+httpRoute:
+  enabled: false
+  parentRef: {}
+  hostnames: []
+  # Generated upstream Service defaults to <release>-server.
+  backendServiceName: ""
+  requestTimeout: 3600s

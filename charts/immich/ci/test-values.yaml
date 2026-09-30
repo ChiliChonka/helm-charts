@@ -1,0 +1,37 @@
+# Fictional render fixture; existing Secrets are not included.
+library:
+  create: true
+  storageClass: example-nfs
+  size: 500Gi
+cnpg:
+  enabled: true
+  instances: 2
+  storageClass: example-block
+  affinity:
+    podAntiAffinityType: required
+  backup:
+    enabled: true
+    destinationPath: s3://example-immich-backup
+    endpointURL: https://s3.example.com
+    credentialsSecret: example-s3-credentials
+    accessKeyIdKey: access-key-id
+    secretAccessKeyKey: secret-access-key
+redisOperator:
+  enabled: true
+  storageClass: example-block
+httpRoute:
+  enabled: true
+  parentRef:
+    name: example-internal
+    namespace: example-gateway
+    sectionName: https
+  hostnames: [photos.example.com]
+immich:
+  immich:
+    configuration: null
+    configurationKind: Secret
+    existingConfiguration: example-immich-config
+  machine-learning:
+    persistence:
+      cache:
+        storageClass: example-block

@@ -28,4 +28,5 @@ echo "== chart-specific tests"
 (cd charts/jellyfin && python3 tools/check_chart.py)
 python3 charts/paperless-ngx/tests/test-admin-bootstrap.py
 python3 charts/paperless-ngx/tests/test-v3.py
+python3 charts/immich/tests/test-chart.py
 echo "OK: all charts"

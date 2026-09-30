@@ -9,6 +9,7 @@ to S3, an `HTTPRoute` for the Gateway API, and optionally data from an NFS expor
 | `jellyfin-helm-chart` | [`charts/jellyfin`](charts/jellyfin) | [Jellyfin](https://jellyfin.org) 12.1, upstream [jellyfin-helm](https://github.com/jellyfin/jellyfin-helm) | — | NFS, Gateway API |
 | `home-assistant-helm-chart` | [`charts/home-assistant`](charts/home-assistant) | [Home Assistant](https://www.home-assistant.io), upstream [pajikos](https://github.com/pajikos/home-assistant-helm-chart) | — | CloudNativePG (recorder DB) + Barman plugin, NFS, Gateway API |
 | `paperless-ngx` | [`charts/paperless-ngx`](charts/paperless-ngx) | [paperless-ngx](https://docs.paperless-ngx.com) 3.2 with Tika and Gotenberg | CloudNativePG, redis-operator | Barman plugin, Gateway API |
+| `immich-helm-chart` | [`charts/immich`](charts/immich) | [Immich](https://immich.app) 3.2.4, official upstream chart | PostgreSQL with VectorChord, Redis, library PVC | CloudNativePG, redis-operator, Barman plugin, Gateway API |
 
 Why the charts build on operators instead of bundled subcharts, and how to install them (order,
 tested versions, pitfalls with Garage, Keycloak and Longhorn): [`docs/operators.md`](docs/operators.md).

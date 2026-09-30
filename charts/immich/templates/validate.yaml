@@ -1,0 +1,28 @@
+{{- if and .Values.redisOperator.enabled .Values.immich.valkey.enabled }}
+{{- fail "Choose redisOperator or immich.valkey, not both" }}
+{{- end }}
+{{- if and .Values.cnpg.backup.enabled (not .Values.cnpg.enabled) }}
+{{- fail "cnpg.backup.enabled requires cnpg.enabled" }}
+{{- end }}
+{{- $cfg := .Values.immich.immich }}
+{{- if and $cfg.existingConfiguration (ne $cfg.configurationKind "Secret") }}
+{{- fail "Use configurationKind: Secret for an external Immich configuration" }}
+{{- end }}
+{{- if dig "oauth" "clientSecret" "" ($cfg.configuration | default dict) }}
+{{- fail "OAuth client secrets must come from an external configuration Secret, never values" }}
+{{- end }}
+
+{{- range $name := list "DB_PASSWORD" "DB_URL" "REDIS_PASSWORD" "REDIS_URL" }}
+{{- $value := index $.Values.immich.server.controllers.main.containers.main.env $name }}
+{{- if $value }}
+{{- if not (kindIs "map" $value) }}
+{{- fail (printf "%s must use a Secret reference, never values" $name) }}
+{{- else if not (hasKey $value "valueFrom") }}
+{{- fail (printf "%s must use a Secret reference, never values" $name) }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if and .Values.cnpg.enabled (not $cfg.existingConfiguration) (dig "backup" "database" "enabled" true ($cfg.configuration | default dict)) }}
+{{- fail "CNPG requires configuration.backup.database.enabled=false or an external config Secret containing that setting" }}
+{{- end }}
