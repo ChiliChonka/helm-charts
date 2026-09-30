@@ -115,5 +115,10 @@ cnpg:
     credentialsSecret: ""     # Secret with the two keys below, created by hand or by an operator
     accessKeyIdKey: ACCESS_KEY_ID
     secretAccessKeyKey: SECRET_ACCESS_KEY
+    # Key in the same Secret that holds the S3 region; empty = not set (client default
+    # us-east-1). Stores that check the region in the signature (Garage) answer 400 otherwise:
+    # a running cluster retries with the region from the error body, a NEW archive fails on
+    # its first HEAD request ("Bad request when accessing bucket").
+    regionKey: ""
     retentionPolicy: "30d"
     schedule: "0 0 2 * * *"   # 6 fields, with seconds

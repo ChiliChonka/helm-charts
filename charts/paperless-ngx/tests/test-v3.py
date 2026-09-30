@@ -85,3 +85,16 @@ for image in images:
     name = image.split('@')[0]
     assert ':' in name.rsplit('/', 1)[-1] and not name.endswith(':latest'), f'unpinned image {image}'
 print(f'PASS: {len(images)} images pinned')
+
+# Backup region: absent by default, taken from the credentials Secret when regionKey is set.
+backup = ['--set', 'cnpg.enabled=true', '--set', 'cnpg.image=example/postgresql:17',
+          '--set', 'cnpg.backup.enabled=true', '--set', 'cnpg.backup.destinationPath=s3://example',
+          '--set', 'cnpg.backup.endpointURL=http://s3.example:9000',
+          '--set', 'cnpg.backup.credentialsSecret=example-s3']
+s3 = one(render(*backup), 'ObjectStore', 'paperless-db-backup-store')['spec']['configuration']['s3Credentials']
+assert 'region' not in s3, s3
+s3 = one(render(*backup, '--set', 'cnpg.backup.regionKey=area'),
+         'ObjectStore', 'paperless-db-backup-store')['spec']['configuration']['s3Credentials']
+assert s3['region'] == {'name': 'example-s3', 'key': 'area'}, s3
+assert s3['accessKeyId'] == {'name': 'example-s3', 'key': 'ACCESS_KEY_ID'}, s3
+print('PASS: backup region optional')
