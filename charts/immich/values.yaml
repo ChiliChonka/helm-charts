@@ -69,6 +69,10 @@ immich:
         strategy: Recreate
         containers:
           main:
+            # The ML service listens on [::] by default. On nodes without IPv6 it fails with
+            # "Errno 97 Address family not supported by protocol"; then set:
+            # env:
+            #   IMMICH_HOST: "0.0.0.0"
             resources:
               requests: {cpu: 250m, memory: 1Gi}
               limits: {memory: 4Gi}
@@ -123,6 +127,10 @@ cnpg:
     credentialsSecret: ""
     accessKeyIdKey: ACCESS_KEY_ID
     secretAccessKeyKey: SECRET_ACCESS_KEY
+    # Key in the same Secret that holds the S3 region; empty = not set (client default
+    # us-east-1). Stores that check the region in the signature (Garage) reject the first
+    # HEAD request of a NEW archive otherwise ("Bad request when accessing bucket").
+    regionKey: ""
     retentionPolicy: "30d"
     # Six fields, seconds first, UTC.
     schedule: "0 0 3 * * *"
@@ -137,6 +145,11 @@ redisOperator:
   passwordKey: password
   storageSize: 1Gi
   storageClass: ""
+  # The image runs as uid 1000; a fresh block volume belongs to root. Without fsGroup Redis
+  # cannot create its append-only dir ("Permission denied") and crash-loops.
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
   resources:
     requests: {cpu: 50m, memory: 64Mi}
     limits: {memory: 512Mi}

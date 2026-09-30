@@ -63,6 +63,7 @@ class ChartTest(unittest.TestCase):
                          self.resource("Cluster")["metadata"]["name"])
         s3 = self.resource("ObjectStore")["spec"]["configuration"]["s3Credentials"]
         self.assertEqual(s3["accessKeyId"], {"name": "example-s3-credentials", "key": "access-key-id"})
+        self.assertEqual(s3["region"], {"name": "example-s3-credentials", "key": "region"})
 
     def test_external_config_and_credentials_stay_out_of_ml(self):
         server = self.resource("Deployment", "photo-test-server")["spec"]["template"]["spec"]
@@ -86,6 +87,9 @@ class ChartTest(unittest.TestCase):
         self.assertEqual(claim["spec"]["storageClassName"], "example-nfs")
         ml = self.resource("PersistentVolumeClaim", "photo-test-machine-learning")
         self.assertEqual(ml["spec"]["resources"]["requests"]["storage"], "10Gi")
+        # Persistent Redis needs fsGroup: the image runs as uid 1000, a block volume is root-owned.
+        self.assertEqual(self.resource("Redis")["spec"]["podSecurityContext"],
+                         {"runAsUser": 1000, "fsGroup": 1000})
         redis = self.resource("Redis")["spec"]["storage"]
         self.assertTrue(redis["keepAfterDelete"])
         self.assertEqual(redis["volumeClaimTemplate"]["spec"]["resources"]["requests"]["storage"], "1Gi")
@@ -128,6 +132,12 @@ class ChartTest(unittest.TestCase):
         result = render("--set", "uiManagedSettings=true")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("exclude each other", result.stderr)
+
+    def test_region_is_optional(self):
+        result = render("--set", "cnpg.backup.regionKey=")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        store = next(d for d in yaml.safe_load_all(result.stdout) if d and d["kind"] == "ObjectStore")
+        self.assertNotIn("region", store["spec"]["configuration"]["s3Credentials"])
 
     def test_default_omits_primary_update_method(self):
         result = render("--set", "cnpg.enabled=true", "--set", "uiManagedSettings=true", fixture=False)

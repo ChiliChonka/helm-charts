@@ -17,6 +17,10 @@ metadata:
   name: {{ $r.name }}
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- with $r.podSecurityContext }}
+  podSecurityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   kubernetesConfig:
     image: {{ required "redisOperator.image is required" $r.image | quote }}
     imagePullPolicy: IfNotPresent

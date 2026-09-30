@@ -49,7 +49,10 @@ history, even when configurationKind is Secret.
   superuser credentials. A standard PostgreSQL image alone is insufficient.
 - **Database backups:** Barman `ObjectStore` and `ScheduledBackup` archive base backups and WAL
   to an existing S3 bucket. For Garage, use the internal endpoint and generated key Secret
-  (`access-key-id`/`secret-access-key`). Bucket, key and cross-namespace Garage grant belong in
+  (`access-key-id`/`secret-access-key`) **and set `cnpg.backup.regionKey: region`**: Garage
+  checks the region in the request signature. Existing archives survive without it (the client
+  retries with the region from the error body), but the first check of a new archive is a
+  `HEAD` request without a body and fails with `Bad request when accessing bucket`. Bucket, key and cross-namespace Garage grant belong in
   the deployment repository, following the existing platform lifecycle.
 - **Immich database dumps:** with CNPG these must be disabled because the app is not a superuser.
   Three ways, and rendering CNPG without one of them is rejected:
@@ -61,7 +64,12 @@ history, even when configurationKind is Secret.
   Database backups then require enabling Barman. Barman does not include photos/videos: configure separate
   NAS backups and test a combined media/database restore before importing originals.
 - **Redis:** authenticated dedicated instance, 1 GiB PVC, AOF (`everysec`) and `noeviction`.
-  Queue persistence handles normal restarts; it is not the media/database backup.
+  Queue persistence handles normal restarts; it is not the media/database backup. The image
+  runs as uid 1000, so the chart sets `podSecurityContext` (`fsGroup: 1000`); without it Redis
+  cannot write to a fresh block volume and crash-loops with `Permission denied`.
+- **IPv4-only nodes:** the machine-learning service binds to `[::]` and fails with `Errno 97`
+  where IPv6 is unavailable. Set `IMMICH_HOST: "0.0.0.0"` in its `env` (example in
+  `values.yaml`).
 - **ML:** initially CPU execution, persistent 10 GiB model cache and one replica. Server and ML
   use `Recreate`; server startup allows migrations up to 20 minutes. Hardware acceleration
   needs separate node/device and image configuration.

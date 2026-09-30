@@ -17,6 +17,7 @@ cnpg:
     credentialsSecret: example-s3-credentials
     accessKeyIdKey: access-key-id
     secretAccessKeyKey: secret-access-key
+    regionKey: region
 redisOperator:
   enabled: true
   storageClass: example-block
