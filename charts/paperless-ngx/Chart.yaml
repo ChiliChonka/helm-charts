@@ -2,7 +2,7 @@ apiVersion: v2
 name: paperless-ngx
 description: Paperless-ngx is a community-supported open-source document management system that transforms your physical documents into a searchable online archive so you can keep, well, less paper. This is an umbrella chart to setup paperless-ngx.
 type: application
-version: 0.4.2
+version: 0.4.3
 appVersion: "3.2.1"
 
 dependencies:

@@ -104,6 +104,12 @@ helm upgrade --install garage-operator oci://ghcr.io/rajsinghtech/charts/garage-
   `cnpg.backup.secretAccessKeyKey`; the defaults expect `ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`).
   Consumers that expect other names (Longhorn wants `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
   `AWS_ENDPOINTS`) get them via `spec.secretTemplate` on the `GarageKey`.
+- **Set the region** (`cnpg.backup.regionKey: region`; the Secret of a `GarageKey` has that key).
+  Garage checks the region in the request signature. Without it the Barman client signs with
+  `us-east-1` and gets `400 … unexpected scope`. A running cluster hides this: the client reads
+  the region from the error body and retries. The first check of a **new or restored** archive
+  is a `HEAD` without a body, so it fails (`Bad request when accessing bucket`,
+  `ContinuousArchiving=False`). The reason is in the Garage log, not in the sidecar.
 - **Metadata never on NFS.** Garage keeps its metadata in LMDB, which is not safe on NFS. Put the
   metadata volume on block storage and the data volume on NFS if you like.
 - **Back up the metadata outside of Garage.** With `replication.factor: 1`, losing the metadata

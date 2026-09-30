@@ -23,6 +23,11 @@ spec:
       secretAccessKey:
         name: {{ $c.backup.credentialsSecret | quote }}
         key: {{ $c.backup.secretAccessKeyKey | quote }}
+      {{- with $c.backup.regionKey }}
+      region:
+        name: {{ $c.backup.credentialsSecret | quote }}
+        key: {{ . | quote }}
+      {{- end }}
     wal:
       compression: gzip
     data:

@@ -2,7 +2,7 @@ apiVersion: v2
 name: home-assistant-helm-chart
 description: Umbrella Chart for Home Assistant on K8s (NFS, CloudNativePG recorder database, Gateway API HTTPRoute)
 type: application
-version: 0.2.0
+version: 0.2.1
 dependencies:
   - name: home-assistant
     version: 0.3.83
