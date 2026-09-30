@@ -1,0 +1,11 @@
+apiVersion: v2
+name: immich-helm-chart
+description: Immich with optional CloudNativePG, Redis operator, library PVC and Gateway API resources
+type: application
+version: 0.1.0
+appVersion: "v3.2.4"
+home: https://immich.app
+dependencies:
+  - name: immich
+    version: 0.13.2
+    repository: oci://ghcr.io/immich-app/immich-charts
