@@ -42,6 +42,7 @@ class ChartTest(unittest.TestCase):
     def test_database_and_credentials_wiring(self):
         cluster = self.resource("Cluster")["spec"]
         self.assertFalse(cluster["enableSuperuserAccess"])
+        self.assertEqual(cluster["primaryUpdateMethod"], "switchover")
         self.assertEqual(cluster["storage"]["storageClass"], "example-block")
         self.assertIn("vchord.so", cluster["postgresql"]["shared_preload_libraries"])
         sql = cluster["bootstrap"]["initdb"]["postInitApplicationSQL"]
@@ -112,12 +113,42 @@ class ChartTest(unittest.TestCase):
         cfg = next(d for d in docs if d["kind"] == "ConfigMap")
         self.assertFalse(yaml.safe_load(cfg["data"]["immich-config.yaml"])["backup"]["database"]["enabled"])
 
+    def test_ui_managed_settings(self):
+        # No config file at all: nothing may be rendered or mounted for it.
+        result = render("--set", "cnpg.enabled=true", "--set", "uiManagedSettings=true", fixture=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        docs = [d for d in yaml.safe_load_all(result.stdout) if d]
+        self.assertEqual(len([d for d in docs if d["kind"] == "Cluster"]), 1)
+        self.assertFalse(any(d["kind"] == "ConfigMap" for d in docs))
+        server = next(d for d in docs if d["kind"] == "Deployment" and d["metadata"]["name"].endswith("-server"))
+        pod = server["spec"]["template"]["spec"]
+        self.assertNotIn("config", {v["name"] for v in pod["volumes"]})
+        self.assertNotIn("IMMICH_CONFIG_FILE", {e["name"] for e in pod["containers"][0]["env"]})
+        # ... and it excludes a config file, which would lock the UI.
+        result = render("--set", "uiManagedSettings=true")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("exclude each other", result.stderr)
+
+    def test_default_omits_primary_update_method(self):
+        result = render("--set", "cnpg.enabled=true", "--set", "uiManagedSettings=true", fixture=False)
+        cluster = next(d for d in yaml.safe_load_all(result.stdout) if d and d["kind"] == "Cluster")
+        self.assertNotIn("primaryUpdateMethod", cluster["spec"])
+
+    def test_bundled_valkey_needs_its_own_hostname(self):
+        result = render("--set", "immich.valkey.enabled=true", fixture=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("REDIS_HOSTNAME", result.stderr)
+        result = render("--set", "immich.valkey.enabled=true", "--set",
+                        "immich.server.controllers.main.containers.main.env.REDIS_HOSTNAME=photo-test-valkey",
+                        fixture=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_invalid_combinations_fail(self):
         cases = [
             ("immich.valkey.enabled=true", "Choose redisOperator"),
             ("cnpg.enabled=false", "requires cnpg.enabled"),
             ("redisOperator.existingSecret=", "existingSecret is required"),
-            ("httpRoute.parentRef.sectionName=", "HTTPS listener"),
+            ("httpRoute.parentRef.sectionName=", "sectionName is required"),
             ("immich.immich.configurationKind=ConfigMap", "configurationKind: Secret"),
         ]
         for value, expected in cases:

@@ -9,6 +9,7 @@ cnpg:
   storageClass: example-block
   affinity:
     podAntiAffinityType: required
+  primaryUpdateMethod: switchover
   backup:
     enabled: true
     destinationPath: s3://example-immich-backup
@@ -25,7 +26,13 @@ httpRoute:
     name: example-internal
     namespace: example-gateway
     sectionName: https
-  hostnames: [photos.example.com]
+  routes:
+    - name: photo-test
+      hostnames: [photos.example.com]
+      rules:
+        - backendRefs: [{name: photo-test-server, port: 2283}]
+          matches: [{path: {type: PathPrefix, value: /}}]
+          timeouts: {request: 3600s}
 immich:
   immich:
     configuration: null

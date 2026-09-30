@@ -18,6 +18,9 @@ spec:
   resources:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $c.primaryUpdateMethod }}
+  primaryUpdateMethod: {{ . }}
+  {{- end }}
   {{- with $c.affinity }}
   affinity:
     {{- toYaml . | nindent 4 }}

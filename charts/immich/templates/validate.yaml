@@ -1,6 +1,11 @@
 {{- if and .Values.redisOperator.enabled .Values.immich.valkey.enabled }}
 {{- fail "Choose redisOperator or immich.valkey, not both" }}
 {{- end }}
+{{- /* The bundled valkey Service is <release>-valkey; the default REDIS_HOSTNAME points at the
+       operator-managed instance and would never connect. */ -}}
+{{- if and .Values.immich.valkey.enabled (eq (toString .Values.immich.server.controllers.main.containers.main.env.REDIS_HOSTNAME) .Values.redisOperator.name) }}
+{{- fail (printf "immich.valkey.enabled needs the server's REDIS_HOSTNAME set to the bundled Service (%s-valkey), not %s" .Release.Name .Values.redisOperator.name) }}
+{{- end }}
 {{- if and .Values.cnpg.backup.enabled (not .Values.cnpg.enabled) }}
 {{- fail "cnpg.backup.enabled requires cnpg.enabled" }}
 {{- end }}
@@ -23,6 +28,9 @@
 {{- end }}
 {{- end }}
 
-{{- if and .Values.cnpg.enabled (not $cfg.existingConfiguration) (dig "backup" "database" "enabled" true ($cfg.configuration | default dict)) }}
-{{- fail "CNPG requires configuration.backup.database.enabled=false or an external config Secret containing that setting" }}
+{{- if and .Values.uiManagedSettings (or $cfg.existingConfiguration ($cfg.configuration | default dict)) }}
+{{- fail "uiManagedSettings and a configuration file exclude each other: a config file locks the settings in the UI" }}
+{{- end }}
+{{- if and .Values.cnpg.enabled (not .Values.uiManagedSettings) (not $cfg.existingConfiguration) (dig "backup" "database" "enabled" true ($cfg.configuration | default dict)) }}
+{{- fail "CNPG requires configuration.backup.database.enabled=false, an external config Secret containing that setting, or uiManagedSettings=true (then disable database dumps in the admin UI)" }}
 {{- end }}

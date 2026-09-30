@@ -1,25 +1,38 @@
+{{- /*
+  HTTPRoute(s) attached to a shared Gateway (Gateway API).
+
+  The app attaches to the wildcard listener of its domain: only the route, no listener, no
+  certificate, no ReferenceGrant.
+
+  - sectionName is required: without it the route would also attach to the HTTP listener and
+    bypass the redirect to HTTPS.
+  - Envoy Gateway applies a 15 s request timeout unless `timeouts.request` is set; long requests
+    (uploads, streams) need their own value.
+  - `rules` are taken verbatim from the values (matches, backendRefs, timeouts) — exactly as the
+    route needs them, without translation by the template.
+*/ -}}
 {{- if .Values.httpRoute.enabled }}
-{{- $r := .Values.httpRoute }}
+{{- range $route := .Values.httpRoute.routes }}
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ .Release.Name }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ required "httpRoute.routes[].name is required" $route.name }}
+  namespace: {{ $.Release.Namespace }}
 spec:
   parentRefs:
+    {{- /* List httpRoute.parentRefs (e.g. temporarily on two gateways), otherwise the single
+         httpRoute.parentRef. */}}
+    {{- range $p := ($.Values.httpRoute.parentRefs | default (list $.Values.httpRoute.parentRef)) }}
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: {{ required "httpRoute.parentRef.name is required" $r.parentRef.name }}
-      namespace: {{ required "httpRoute.parentRef.namespace is required" $r.parentRef.namespace }}
-      sectionName: {{ required "httpRoute.parentRef.sectionName must select the HTTPS listener" $r.parentRef.sectionName }}
+      name: {{ required "httpRoute.parentRef(s).name is required" $p.name }}
+      namespace: {{ required "httpRoute.parentRef(s).namespace is required" $p.namespace }}
+      sectionName: {{ required "httpRoute.parentRef(s).sectionName is required (otherwise the route bypasses the HTTPS redirect)" $p.sectionName }}
+    {{- end }}
   hostnames:
-    {{- toYaml (required "httpRoute.hostnames is required" $r.hostnames) | nindent 4 }}
+    {{- toYaml (required "httpRoute.routes[].hostnames is required" $route.hostnames) | nindent 4 }}
   rules:
-    - matches:
-        - path: {type: PathPrefix, value: /}
-      backendRefs:
-        - name: {{ $r.backendServiceName | default (printf "%s-server" .Release.Name) }}
-          port: 2283
-      timeouts:
-        request: {{ $r.requestTimeout | quote }}
+    {{- toYaml (required "httpRoute.routes[].rules is required" $route.rules) | nindent 4 }}
+{{- end }}
 {{- end }}

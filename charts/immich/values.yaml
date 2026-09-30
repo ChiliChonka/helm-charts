@@ -16,6 +16,7 @@ immich:
     # configuration: {backup: {database: {enabled: false}}}
     # CNPG's app user is not a superuser; use Barman for database backups.
     # Any config file disables system-settings editing in the Immich UI.
+    # To keep settings editable in the UI, leave this empty and set uiManagedSettings below.
     configuration: {}
     # For OAuth, provide an external Secret containing immich-config.yaml.
     # Its COMPLETE config must include backup.database.enabled: false for CNPG.
@@ -49,6 +50,8 @@ immich:
               REDIS_PASSWORD:
                 valueFrom:
                   secretKeyRef: {name: immich-redis-auth, key: password}
+              # Behind a gateway Immich otherwise logs the proxy's pod IP as the client:
+              # IMMICH_TRUSTED_PROXIES: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
             resources:
               requests: {cpu: 250m, memory: 1Gi}
               limits: {memory: 4Gi}
@@ -76,11 +79,18 @@ immich:
         accessMode: ReadWriteOnce
         # storageClass: your-block-storage-class
 
+# Settings are managed in the admin UI: no config file is rendered. With CloudNativePG you
+# then MUST switch off Immich's own database dumps in the admin settings:
+# the app role is not a superuser, the dump job would fail every night. Use Barman instead.
+uiManagedSettings: false
+
 # Claim name is immich.immich.persistence.library.existingClaim.
 # For dynamic NFS use an existing CSI StorageClass with Retain/onDelete: retain.
 library:
   create: false
   size: 100Gi
+  # Only the server mounts the library (one replica, Recreate): ReadWriteOnce is enough on
+  # block storage without an RWX driver.
   accessModes: [ReadWriteMany]
   storageClass: ""
   annotations:
@@ -98,6 +108,10 @@ cnpg:
   database: immich
   owner: immich
   affinity: {}
+  # "restart" (CloudNativePG default) or "switchover". Empty = field omitted. With two instances,
+  # "switchover" promotes the replica first; a restart of the primary can take minutes while
+  # Postgres waits for open connections (smart shutdown).
+  primaryUpdateMethod: ""
   resources:
     requests: {cpu: 250m, memory: 512Mi}
     limits: {memory: 2Gi}
@@ -127,11 +141,19 @@ redisOperator:
     requests: {cpu: 50m, memory: 64Mi}
     limits: {memory: 512Mi}
 
-# Envoy/shared Gateway terminates TLS. No separate proxy OAuth: use Immich OIDC.
+# Shared Gateway terminates TLS. No separate proxy OAuth: use Immich OIDC.
+# Same shape as the other charts in this repository. The upstream Service is <release>-server,
+# port 2283. Envoy Gateway cuts requests after 15 s unless timeouts.request is set; uploads of
+# large videos need a long value.
 httpRoute:
   enabled: false
   parentRef: {}
-  hostnames: []
-  # Generated upstream Service defaults to <release>-server.
-  backendServiceName: ""
-  requestTimeout: 3600s
+  # parentRef: {name: my-gateway, namespace: gateway-system, sectionName: https}
+  routes: []
+  # routes:
+  #   - name: immich
+  #     hostnames: [photos.example.com]
+  #     rules:
+  #       - backendRefs: [{name: immich-server, port: 2283}]
+  #         matches: [{path: {type: PathPrefix, value: /}}]
+  #         timeouts: {request: 3600s}

@@ -24,7 +24,8 @@ helm upgrade --install immich charts/immich -n immich --create-namespace \
 Defaults render without operator CRDs but require an existing `immich-library` PVC,
 `immich-db-rw` PostgreSQL service, `immich-db-app` Secret (username/password), `immich-redis`
 service and `immich-redis-auth` Secret (password). ML creates a 10 GiB cache PVC using the
-default StorageClass. Without a config file, system settings remain editable in the UI. Enable `library.create`, `cnpg.enabled` and `redisOperator.enabled` to
+default StorageClass. Without a config file, system settings remain editable in the UI (with
+CloudNativePG set `uiManagedSettings: true`, see below). Enable `library.create`, `cnpg.enabled` and `redisOperator.enabled` to
 manage those services in this release. [CI values](ci/test-values.yaml) show a fictional setup.
 Operator resources and the library claim have fixed configurable names; use one release per
 namespace or change these names and matching server env references together.
@@ -51,8 +52,12 @@ history, even when configurationKind is Secret.
   (`access-key-id`/`secret-access-key`). Bucket, key and cross-namespace Garage grant belong in
   the deployment repository, following the existing platform lifecycle.
 - **Immich database dumps:** with CNPG these must be disabled because the app is not a superuser.
-  Set `immich.immich.configuration.backup.database.enabled: false` or use an external config
-  containing `backup.database.enabled: false`; rendering CNPG without either is rejected.
+  Three ways, and rendering CNPG without one of them is rejected:
+  `immich.immich.configuration.backup.database.enabled: false` (inline config file), an external
+  config Secret containing `backup.database.enabled: false`, or **`uiManagedSettings: true`** —
+  no config file at all, settings stay editable in the admin UI, and you switch the dumps off
+  in the admin settings. `uiManagedSettings` and a config file exclude each
+  other. The UI can export the settings as JSON if you later want to freeze them into a file.
   Database backups then require enabling Barman. Barman does not include photos/videos: configure separate
   NAS backups and test a combined media/database restore before importing originals.
 - **Redis:** authenticated dedicated instance, 1 GiB PVC, AOF (`everysec`) and `noeviction`.
@@ -60,8 +65,16 @@ history, even when configurationKind is Secret.
 - **ML:** initially CPU execution, persistent 10 GiB model cache and one replica. Server and ML
   use `Recreate`; server startup allows migrations up to 20 minutes. Hardware acceleration
   needs separate node/device and image configuration.
+- **NFS permissions:** the server runs as root and creates its folders under `/data`. An export
+  that maps root to an unprivileged user works as long as that user may write (then all files
+  belong to it); an export that maps root to `nobody` without write access fails with `EACCES`.
+  Test with a throwaway pod before the first start.
+- **Library access mode:** only the server mounts the library; `ReadWriteOnce` is enough on
+  block storage without an RWX driver.
 
-For two CNPG instances use separate nodes (`affinity.podAntiAffinityType: required`). A block
+For two CNPG instances use separate nodes (`affinity.podAntiAffinityType: required`) and
+`cnpg.primaryUpdateMethod: switchover`, so a rollout promotes the replica instead of restarting
+the primary (a restart can take minutes while Postgres waits for open connections). A block
 StorageClass with one storage replica is appropriate only when database replication provides
 the additional copy. A single CNPG instance on single-replica storage has no failover copy.
 Resource values are starting estimates, not measured capacity guarantees.
@@ -123,15 +136,20 @@ keys; include account/session revocation in offboarding.
 External config replaces the chart config entirely. File configuration disables system-settings
 editing in the UI, even for keys absent from the file. External Secret changes do not trigger
 a rollout here: restart the server after updating config. Alternatively manage OIDC through
-the admin UI and remove file configuration entirely; also disable database dumps there.
+the admin UI: set `uiManagedSettings: true`, keep `configuration` empty, enter issuer, client id
+and client secret in the UI (the secret is then stored in Immich's database) and disable
+database dumps there.
 
 ## Gateway and relevant parameters
 
-The HTTPRoute attaches `/` to the existing HTTPS listener and `<release>-server:2283`. If changing
-upstream Service names, set `httpRoute.backendServiceName`. Immich requires its own hostname,
-not a subpath; `/.well-known/immich` must reach the app. The 3600s request timeout allows long
-uploads. Validate large uploads and WebSockets through every proxy hop; HTTPRoute settings
-cannot change limits imposed by another proxy.
+`httpRoute` has the same shape as in the other charts of this repository: `parentRef` (or
+`parentRefs`) plus `routes[]` with `hostnames` and verbatim `rules`. Point the rule at
+`<release>-server:2283` and set `timeouts.request` (example in `values.yaml`: `3600s`) — Envoy
+Gateway cuts requests after 15 s otherwise, which breaks video uploads. Envoy Gateway does not
+buffer or limit request bodies unless you add such a policy yourself; do not add one for
+uploads. Immich requires its own hostname, not a subpath; `/.well-known/immich` must reach the
+app. Validate large uploads and WebSockets through every proxy hop; HTTPRoute settings cannot
+change limits imposed by another proxy (e.g. Cloudflare's 100 MB per request on the free plan).
 
 | Setting | Purpose / starting point |
 |---|---|
@@ -142,7 +160,9 @@ cannot change limits imposed by another proxy.
 | Server `DB_VECTOR_EXTENSION` | vectorchord; leave migrations enabled |
 | Server `DB_URL` | Optional Secret reference; overrides individual connection settings |
 | Server `REDIS_HOSTNAME`, `REDIS_PORT`, `REDIS_PASSWORD` | Dedicated queue, 6379, Secret reference |
-| Server `IMMICH_TRUSTED_PROXIES` | Actual trusted proxy addresses/ranges after network review |
+| Server `IMMICH_TRUSTED_PROXIES` | Pod and node ranges of your gateway; without it Immich logs the proxy as the client |
+| `uiManagedSettings` | `true`: no config file, settings and OIDC in the admin UI |
+| `cnpg.primaryUpdateMethod` | `switchover` with two instances |
 | Server `IMMICH_ALLOW_SETUP` | Default for first-admin setup; false after onboarding |
 | Server `IMMICH_LOG_LEVEL` | Default log; debug only when needed |
 | `IMMICH_CONFIG_FILE` | Set and mounted by upstream for the config Secret |
@@ -158,7 +178,7 @@ Credentials are server-only; ML needs no DB/Redis credentials.
 
 Run `python3 charts/immich/tests/test-chart.py` after building dependencies. Render tests cover
 route wiring, persistence, bootstrap, backup references, server-only credentials, external
-config mounting and invalid combinations. They do not prove operator reconciliation, NFS
+config mounting, UI-managed settings and invalid combinations. They do not prove operator reconciliation, NFS
 permissions, migrations or OIDC login; those require a staging rollout.
 
 - [Kubernetes](https://docs.immich.app/install/kubernetes/), [chart 0.13.2](https://github.com/immich-app/immich-charts/tree/immich-0.13.2), [app v3.2.4](https://github.com/immich-app/immich/releases/tag/v3.2.4)
