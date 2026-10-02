@@ -44,6 +44,26 @@ oidc:
     claim: roles
     # Claim values: ocisAdmin, ocisSpaceAdmin, ocisUser, ocisGuest (oCIS defaults).
 
+# Content-Security-Policy of the web UI. oCIS replaces its built-in policy completely with this
+# file, so these are oCIS 8.2.1's defaults. With oidc.enabled the chart adds the issuer's origin to
+# connect-src: the browser fetches the IDP's discovery and token endpoints itself, and without it
+# the login fails with "problems connecting to the login service" before any request leaves
+# the browser. Add your own sources here (e.g. an office suite in frame-src).
+csp:
+  directives:
+    child-src: ["'self'"]
+    connect-src: ["'self'", "blob:", "https://raw.githubusercontent.com/owncloud/awesome-ocis/"]
+    default-src: ["'none'"]
+    font-src: ["'self'", "data:"]
+    frame-ancestors: ["'self'"]
+    frame-src: ["'self'", "blob:", "https://embed.diagrams.net/"]
+    img-src: ["'self'", "data:", "blob:", "https://raw.githubusercontent.com/owncloud/awesome-ocis/"]
+    manifest-src: ["'self'"]
+    media-src: ["'self'"]
+    object-src: ["'self'", "blob:"]
+    script-src: ["'self'", "'unsafe-inline'"]
+    style-src: ["'self'", "'unsafe-inline'"]
+
 persistence:
   # /etc/ocis: ocis.yaml with the secrets that `ocis init` generates on the first start.
   # Losing it locks you out of all data; back it up together with the data volume.

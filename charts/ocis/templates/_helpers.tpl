@@ -20,3 +20,14 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $v := index .root.Values.persistence .volume }}
 {{- $v.existingClaim | default (printf "%s-%s" (include "ocis.fullname" .root) .volume) }}
 {{- end }}
+
+{{/* CSP directives: values plus, with OIDC, the issuer's origin (scheme://host/) in connect-src. */}}
+{{- define "ocis.csp" -}}
+{{- $d := deepCopy .Values.csp.directives }}
+{{- if .Values.oidc.enabled }}
+{{- $u := urlParse .Values.oidc.issuer }}
+{{- $origin := printf "%s://%s/" $u.scheme $u.host }}
+{{- $_ := set $d "connect-src" (append (get $d "connect-src" | default list) $origin | uniq) }}
+{{- end }}
+{{- toYaml (dict "directives" $d) }}
+{{- end }}

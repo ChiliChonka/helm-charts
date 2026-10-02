@@ -21,6 +21,9 @@ spec:
     metadata:
       labels:
         {{- include "ocis.labels" . | nindent 8 }}
+      annotations:
+        # oCIS reads the CSP only at start.
+        checksum/csp: {{ include "ocis.csp" . | sha256sum }}
     spec:
       {{- with .Values.podSecurityContext }}
       securityContext:
@@ -69,6 +72,7 @@ spec:
             # TLS ends at the gateway.
             - {name: PROXY_TLS, value: "false"}
             - {name: PROXY_HTTP_ADDR, value: "0.0.0.0:9200"}
+            - {name: PROXY_CSP_CONFIG_FILE_LOCATION, value: /etc/ocis-csp/csp.yaml}
             {{- with .Values.defaultLanguage }}
             - {name: OCIS_DEFAULT_LANGUAGE, value: {{ . | quote }}}
             {{- end }}
@@ -136,10 +140,13 @@ spec:
           volumeMounts:
             - {name: config, mountPath: /etc/ocis}
             - {name: data, mountPath: /var/lib/ocis}
+            - {name: csp, mountPath: /etc/ocis-csp, readOnly: true}
             {{- if .Values.persistence.files.enabled }}
             - {name: files, mountPath: /var/lib/ocis-files}
             {{- end }}
       volumes:
+        - name: csp
+          configMap: {name: {{ include "ocis.fullname" . }}-csp}
         - name: config
           persistentVolumeClaim: {claimName: {{ include "ocis.claimName" (dict "root" . "volume" "config") }}}
         - name: data
