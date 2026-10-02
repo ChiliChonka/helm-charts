@@ -78,12 +78,13 @@ class FixtureTest(unittest.TestCase):
         self.assertEqual(claims[f"{RELEASE}-data"]["spec"]["resources"]["requests"]["storage"], "50Gi")
         for claim in claims.values():
             self.assertEqual(claim["metadata"]["annotations"]["helm.sh/resource-policy"], "keep")
-        volumes = {v["name"]: v["persistentVolumeClaim"]["claimName"] for v in self.pod["volumes"]}
+        volumes = {v["name"]: v["persistentVolumeClaim"]["claimName"] for v in self.pod["volumes"]
+                   if "persistentVolumeClaim" in v}
         self.assertEqual(volumes, {"config": f"{RELEASE}-config", "data": f"{RELEASE}-data",
                                    "files": f"{RELEASE}-files"})
         mounts = {m["name"]: m["mountPath"] for m in self.main["volumeMounts"]}
         self.assertEqual(mounts, {"config": "/etc/ocis", "data": "/var/lib/ocis",
-                                  "files": "/var/lib/ocis-files"})
+                                  "files": "/var/lib/ocis-files", "csp": "/etc/ocis-csp"})
         self.assertEqual(self.env["STORAGE_USERS_OCIS_ROOT"]["value"], mounts["files"])
 
     def test_init_writes_config_once_and_hides_output(self):
@@ -135,6 +136,57 @@ class FixtureTest(unittest.TestCase):
         self.assertEqual(self.main["image"], f"docker.io/owncloud/ocis:{version}")
 
 
+# oCIS 8.2.1 built-in policy (services/proxy/pkg/config/csp.yaml). The chart's file REPLACES it.
+OCIS_DEFAULT_CONNECT_SRC = ["'self'", "blob:", "https://raw.githubusercontent.com/owncloud/awesome-ocis/"]
+
+
+def csp_of(docs):
+    maps = [d for d in find(docs, "ConfigMap") if d["metadata"]["name"].endswith("-csp")]
+    assert len(maps) == 1, maps
+    return yaml.safe_load(maps[0]["data"]["csp.yaml"])["directives"]
+
+
+class CspTest(unittest.TestCase):
+    """Regression 2026-10-03: without the IDP in connect-src the browser never reaches Keycloak
+    ("problems connecting to the login service"); token tests with curl do not see a CSP."""
+
+    def test_issuer_origin_allowed_for_the_browser(self):
+        docs = docs_of(render())
+        connect = csp_of(docs)["connect-src"]
+        self.assertEqual(connect, OCIS_DEFAULT_CONNECT_SRC + ["https://sso.example.com/"])
+
+    def test_policy_is_mounted_where_ocis_reads_it(self):
+        docs = docs_of(render())
+        pod = pod_of(docs)
+        main = pod["containers"][0]
+        location = env_of(main)["PROXY_CSP_CONFIG_FILE_LOCATION"]["value"]
+        mount = [m for m in main["volumeMounts"] if location.startswith(m["mountPath"] + "/")]
+        self.assertEqual(len(mount), 1, location)
+        volume = [v for v in pod["volumes"] if v["name"] == mount[0]["name"]][0]
+        self.assertEqual(volume["configMap"]["name"], f"{RELEASE}-csp")
+        self.assertEqual(location.rsplit("/", 1)[1], "csp.yaml")
+
+    def test_without_oidc_the_defaults_stay(self):
+        docs = docs_of(render(fixture="ci/required-values.yaml"))
+        directives = csp_of(docs)
+        self.assertEqual(directives["connect-src"], OCIS_DEFAULT_CONNECT_SRC)
+        self.assertEqual(directives["default-src"], ["'none'"])
+        self.assertEqual(len(directives), 12)
+
+    def test_issuer_with_port_and_path_gives_origin_only(self):
+        docs = docs_of(render("--set", "oidc.issuer=https://sso.example.com:8443/realms/x"))
+        self.assertIn("https://sso.example.com:8443/", csp_of(docs)["connect-src"])
+
+    def test_policy_change_restarts_the_pod(self):
+        a = pod_of(docs_of(render()))
+        b = pod_of(docs_of(render("--set", "oidc.issuer=https://other.example.com/realms/x")))
+        self.assertNotEqual(a, b)
+        key = "checksum/csp"
+        ann = lambda docs: find(docs, "Deployment")[0]["spec"]["template"]["metadata"]["annotations"][key]
+        self.assertNotEqual(ann(docs_of(render())),
+                            ann(docs_of(render("--set", "oidc.issuer=https://other.example.com/realms/x"))))
+
+
 class BuiltinLoginTest(unittest.TestCase):
     """Required values only: built-in IDP, admin password from a Secret, no files volume."""
 
@@ -152,7 +204,8 @@ class BuiltinLoginTest(unittest.TestCase):
     def test_no_oidc_no_files(self):
         env = env_of(self.pod["containers"][0])
         self.assertEqual(set(env), {"OCIS_URL", "OCIS_LOG_LEVEL", "OCIS_INSECURE", "PROXY_TLS",
-                                    "PROXY_HTTP_ADDR", "IDM_ADMIN_PASSWORD"})
+                                    "PROXY_HTTP_ADDR", "PROXY_CSP_CONFIG_FILE_LOCATION",
+                                    "IDM_ADMIN_PASSWORD"})
         for name in ("OCIS_EXCLUDE_RUN_SERVICES", "OCIS_OIDC_ISSUER", "STORAGE_USERS_OCIS_ROOT"):
             self.assertNotIn(name, env)
         self.assertEqual(len(find(self.docs, "PersistentVolumeClaim")), 2)
@@ -164,7 +217,8 @@ class BuiltinLoginTest(unittest.TestCase):
                               fixture="ci/required-values.yaml"))
         names = [d["metadata"]["name"] for d in find(docs, "PersistentVolumeClaim")]
         self.assertEqual(names, [f"{RELEASE}-config"])
-        volumes = {v["name"]: v["persistentVolumeClaim"]["claimName"] for v in pod_of(docs)["volumes"]}
+        volumes = {v["name"]: v["persistentVolumeClaim"]["claimName"] for v in pod_of(docs)["volumes"]
+                   if "persistentVolumeClaim" in v}
         self.assertEqual(volumes["data"], "old-data")
 
     def test_role_driver_default_keeps_default_role(self):

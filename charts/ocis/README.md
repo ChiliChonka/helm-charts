@@ -56,7 +56,16 @@ Required values: `url`, plus either `oidc.*` or `admin.existingSecret` (the mini
 
 Tested 2026-10-03 with Keycloak 26.7.4 and oCIS 8.2.1 in a throwaway realm: a user with role
 `ocisUser` is created on the first login (graph `/me` 200, WebDAV upload 201); a user without a
-role is rejected; without a token 401.
+role is rejected; without a token 401. Since 0.1.1 also with a **real browser** (headless
+Chromium): redirect to Keycloak, login form, back in `/files/spaces/personal`, `/me` 200.
+
+**Content-Security-Policy (fixed in 0.1.1):** the web UI fetches the IDP's discovery and token
+endpoints from the browser. oCIS's built-in policy only allows `'self'` in `connect-src`, so
+Chrome refused the request before it left the browser; the UI showed "We're having trouble
+connecting to the login service", and neither oCIS nor the gateway logged anything. The chart
+now writes the policy (`csp.directives`, oCIS defaults) to a ConfigMap and adds the issuer's
+origin when `oidc.enabled`. The file replaces oCIS's policy entirely; extend `csp.directives`
+for further sources. Token tests with `curl` cannot catch this: only a browser enforces a CSP.
 
 On the Keycloak side (settings from ownCloud's example `deployments/examples/ocis_full`):
 
@@ -94,5 +103,6 @@ and the server-sent events of the web UI. oCIS needs its own hostname.
 ## Tests
 
 `python3 charts/ocis/tests/test-chart.py`: route and service wiring, claims and mounts, init
-container, OIDC settings, secrets only by reference, and the combinations that must fail. They do
+container, OIDC settings, the CSP (issuer origin in `connect-src`, mounted where oCIS reads it),
+secrets only by reference, and the combinations that must fail. They do
 not prove login or uploads; those were checked in the cluster as described above.
