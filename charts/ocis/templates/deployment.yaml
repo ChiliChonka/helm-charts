@@ -1,0 +1,162 @@
+{{- /*
+  One pod, Recreate: the single binary keeps bolt databases, NATS JetStream and the search index on
+  its data volume. A second pod on the same volumes would corrupt them.
+*/ -}}
+{{- $o := .Values.oidc }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ocis.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ocis.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "ocis.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ocis.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # `ocis init` writes /etc/ocis/ocis.yaml with random secrets, once. Its output contains the
+        # admin password and is discarded; the password comes from admin.existingSecret.
+        - name: init-config
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ -f /etc/ocis/ocis.yaml ]; then
+                echo "ocis.yaml exists, keeping it"
+              else
+                ocis init --insecure false >/dev/null && echo "ocis.yaml created"
+              fi
+          {{- with .Values.admin.existingSecret }}
+          env:
+            - name: IDM_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ . | quote }}, key: {{ $.Values.admin.passwordKey | quote }}}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - {name: config, mountPath: /etc/ocis}
+      containers:
+        - name: ocis
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: [server]
+          env:
+            - {name: OCIS_URL, value: {{ .Values.url | quote }}}
+            - {name: OCIS_LOG_LEVEL, value: {{ .Values.logLevel | quote }}}
+            - {name: OCIS_INSECURE, value: "false"}
+            # TLS ends at the gateway.
+            - {name: PROXY_TLS, value: "false"}
+            - {name: PROXY_HTTP_ADDR, value: "0.0.0.0:9200"}
+            {{- with .Values.defaultLanguage }}
+            - {name: OCIS_DEFAULT_LANGUAGE, value: {{ . | quote }}}
+            {{- end }}
+            {{- with .Values.admin.existingSecret }}
+            # Only read when IDM creates the admin on the first start.
+            - name: IDM_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ . | quote }}, key: {{ $.Values.admin.passwordKey | quote }}}
+            {{- end }}
+            {{- if .Values.persistence.files.enabled }}
+            - {name: STORAGE_USERS_OCIS_ROOT, value: /var/lib/ocis-files}
+            {{- end }}
+            {{- if $o.enabled }}
+            # External IDP, settings as in ownCloud's Keycloak example (deployments/examples/ocis_full).
+            - {name: OCIS_EXCLUDE_RUN_SERVICES, value: idp}
+            - {name: OCIS_OIDC_ISSUER, value: {{ $o.issuer | quote }}}
+            - {name: WEB_OIDC_CLIENT_ID, value: {{ $o.webClientId | quote }}}
+            {{- with $o.scope }}
+            - {name: WEB_OIDC_SCOPE, value: {{ . | quote }}}
+            {{- end }}
+            - {name: PROXY_OIDC_REWRITE_WELLKNOWN, value: "true"}
+            - {name: PROXY_USER_OIDC_CLAIM, value: {{ $o.userClaim | quote }}}
+            - {name: PROXY_USER_CS3_CLAIM, value: username}
+            - {name: PROXY_AUTOPROVISION_ACCOUNTS, value: {{ $o.autoprovisionAccounts | quote }}}
+            - {name: PROXY_ROLE_ASSIGNMENT_DRIVER, value: {{ $o.roleAssignment.driver | quote }}}
+            {{- if eq $o.roleAssignment.driver "oidc" }}
+            - {name: PROXY_ROLE_ASSIGNMENT_OIDC_CLAIM, value: {{ $o.roleAssignment.claim | quote }}}
+            # Roles come from the token; no implicit "user" role for new accounts.
+            - {name: GRAPH_ASSIGN_DEFAULT_USER_ROLE, value: "false"}
+            {{- end }}
+            # Usernames from the IDP (e.g. mail addresses) are taken as they are.
+            - {name: GRAPH_USERNAME_MATCH, value: none}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - {name: http, containerPort: 9200, protocol: TCP}
+          # /status.php is answered by the frontend service behind the proxy: ready means the
+          # proxy and the services clients talk to are up. Liveness only checks the port, so a
+          # slow pod under load is not restarted in the middle of uploads.
+          startupProbe:
+            httpGet: {path: /status.php, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /status.php, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket: {port: http}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - {name: config, mountPath: /etc/ocis}
+            - {name: data, mountPath: /var/lib/ocis}
+            {{- if .Values.persistence.files.enabled }}
+            - {name: files, mountPath: /var/lib/ocis-files}
+            {{- end }}
+      volumes:
+        - name: config
+          persistentVolumeClaim: {claimName: {{ include "ocis.claimName" (dict "root" . "volume" "config") }}}
+        - name: data
+          persistentVolumeClaim: {claimName: {{ include "ocis.claimName" (dict "root" . "volume" "data") }}}
+        {{- if .Values.persistence.files.enabled }}
+        - name: files
+          persistentVolumeClaim: {claimName: {{ include "ocis.claimName" (dict "root" . "volume" "files") }}}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

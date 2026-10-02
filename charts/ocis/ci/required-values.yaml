@@ -1,0 +1,4 @@
+# The values without a usable default; everything else stays at its default. Made up.
+url: https://cloud.example.com
+admin:
+  existingSecret: example-ocis-admin

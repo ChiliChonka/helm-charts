@@ -1,0 +1,37 @@
+# Fictional render fixture; existing Secrets are not included.
+url: https://cloud.example.com
+defaultLanguage: de
+oidc:
+  enabled: true
+  issuer: https://sso.example.com/realms/example
+persistence:
+  config:
+    storageClass: example-block
+  data:
+    storageClass: example-block
+    size: 50Gi
+  files:
+    enabled: true
+    storageClass: example-nfs
+    size: 500Gi
+extraEnv:
+  - name: NOTIFICATIONS_SMTP_HOST
+    value: smtp.example.com
+  - name: NOTIFICATIONS_SMTP_PASSWORD
+    valueFrom: {secretKeyRef: {name: example-smtp, key: password}}
+httpRoute:
+  enabled: true
+  parentRef:
+    name: example-internal
+    namespace: example-gateway
+    sectionName: https
+  routes:
+    - name: cloud-test
+      hostnames: [cloud.example.com]
+      rules:
+        - backendRefs: [{name: cloud-test, port: 9200}]
+          matches: [{path: {type: PathPrefix, value: /}}]
+          timeouts: {request: 3600s}
+hostAliases:
+  - ip: 192.0.2.41
+    hostnames: [cloud.example.com]

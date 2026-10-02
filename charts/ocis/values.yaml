@@ -1,0 +1,127 @@
+# ownCloud Infinite Scale as a single binary (`ocis server`): one pod runs all services, with the
+# embedded NATS, IDM (LDAP) and search index. No database and no cache are needed.
+# Never put passwords, client secrets or S3 keys in values.
+
+image:
+  repository: docker.io/owncloud/ocis
+  tag: "8.2.1"
+  pullPolicy: IfNotPresent
+
+# Public URL as users and clients reach it (OCIS_URL), e.g. https://cloud.example.com.
+# oCIS needs its own hostname; a subpath is not supported.
+url: ""
+
+logLevel: info
+# UI and mail language for users without their own setting, e.g. "de". Empty = English.
+defaultLanguage: ""
+
+# Built-in login (oCIS IDP). The user "admin" gets its password from this Secret on the first
+# start; later changes to the Secret do not change the password (change it in the UI).
+# Required unless oidc.enabled; with OIDC the built-in admin cannot log in anyway.
+admin:
+  existingSecret: ""
+  passwordKey: password
+
+# External OpenID Connect provider (e.g. Keycloak) instead of the built-in IDP.
+# The web UI uses a PUBLIC client (PKCE, no secret); see README for the Keycloak side.
+oidc:
+  enabled: false
+  # e.g. https://sso.example.com/realms/EXAMPLE
+  issuer: ""
+  webClientId: web
+  # Empty = oCIS default ("openid profile email").
+  scope: ""
+  # Create oCIS accounts on the first login. With roleAssignment "oidc" only users carrying one
+  # of the role values below can log in at all.
+  autoprovisionAccounts: true
+  userClaim: preferred_username
+  roleAssignment:
+    # "oidc": role from the token on every login (claim below). "default": everybody becomes
+    # "user", admins are promoted in the oCIS UI.
+    driver: oidc
+    # Keycloak's standard "roles" scope puts realm roles in realm_access.roles; add a mapper
+    # that writes them to this top-level claim (README).
+    claim: roles
+    # Claim values: ocisAdmin, ocisSpaceAdmin, ocisUser, ocisGuest (oCIS defaults).
+
+persistence:
+  # /etc/ocis: ocis.yaml with the secrets that `ocis init` generates on the first start.
+  # Losing it locks you out of all data; back it up together with the data volume.
+  config:
+    existingClaim: ""
+    size: 1Gi
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+  # /var/lib/ocis: IDM (bolt DB), NATS JetStream, search index, thumbnails and, unless `files`
+  # is enabled, the user files. Use block storage: bolt and the index rely on file locks/mmap.
+  data:
+    existingClaim: ""
+    size: 20Gi
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+  # Optional separate volume for the user files only (spaces), e.g. on NFS. Sets
+  # STORAGE_USERS_OCIS_ROOT. Decide before the first start: oCIS does not move existing files.
+  files:
+    enabled: false
+    existingClaim: ""
+    size: 100Gi
+    storageClass: ""
+    accessModes: [ReadWriteMany]
+  # Claims created by this chart survive `helm uninstall`.
+  annotations:
+    helm.sh/resource-policy: keep
+
+# Additional environment variables for oCIS (list of EnvVar). Anything named *PASSWORD*,
+# *SECRET* or *API_KEY* must come from a Secret (valueFrom), the render fails otherwise.
+extraEnv: []
+# extraEnv:
+#   - name: NOTIFICATIONS_SMTP_HOST
+#     value: smtp.example.com
+#   - name: NOTIFICATIONS_SMTP_PASSWORD
+#     valueFrom: {secretKeyRef: {name: ocis-smtp, key: password}}
+
+resources:
+  requests: {cpu: 250m, memory: 512Mi}
+  limits: {memory: 2Gi}
+
+# The image runs as uid/gid 1000. fsGroup makes fresh block volumes writable; an NFS export must
+# allow uid 1000 to write (fsGroup does not apply to NFS).
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  runAsNonRoot: true
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities: {drop: [ALL]}
+
+# oCIS calls ITSELF through `url`: uploads go from the WebDAV service to <url>/data, and the same
+# URL is handed to clients, so it cannot simply point to an internal address. The pod must resolve
+# the hostname and reach the gateway with a trusted certificate. Normally cluster DNS forwards to
+# a resolver that knows the name; otherwise map it here to the gateway's address:
+hostAliases: []
+# hostAliases:
+#   - ip: 192.0.2.41
+#     hostnames: [cloud.example.com]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Shared Gateway terminates TLS; oCIS speaks plain HTTP on 9200 (PROXY_TLS=false).
+# Same shape as the other charts in this repository. The Service is <release>, port 9200.
+# Envoy Gateway cuts requests after 15 s unless timeouts.request is set: uploads from WebDAV
+# clients without chunking (TUS) and the server-sent events of the web UI need a long value.
+httpRoute:
+  enabled: false
+  parentRef: {}
+  # parentRef: {name: my-gateway, namespace: gateway-system, sectionName: https}
+  routes: []
+  # routes:
+  #   - name: ocis
+  #     hostnames: [cloud.example.com]
+  #     rules:
+  #       - backendRefs: [{name: ocis, port: 9200}]
+  #         matches: [{path: {type: PathPrefix, value: /}}]
+  #         timeouts: {request: 3600s}

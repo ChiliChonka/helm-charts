@@ -1,0 +1,27 @@
+{{- /* One claim per volume, unless an existing claim is given. Kept on uninstall (annotations). */ -}}
+{{- range $volume := list "config" "data" "files" }}
+{{- $v := index $.Values.persistence $volume }}
+{{- if and (or (ne $volume "files") $v.enabled) (not $v.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ocis.claimName" (dict "root" $ "volume" $volume) }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "ocis.labels" $ | nindent 4 }}
+  {{- with $.Values.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml $v.accessModes | nindent 4 }}
+  {{- with $v.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $v.size }}
+{{- end }}
+{{- end }}
