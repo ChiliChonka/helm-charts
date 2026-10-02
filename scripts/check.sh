@@ -16,8 +16,12 @@ for chart in charts/*/; do
   echo "== $name"
   # The tika index contains invalid entries (3.2.2.0); Helm warns about them on every run.
   helm dependency build "$chart" 2> >(grep -v "skipping loading invalid entry" >&2) >/dev/null
-  helm lint "$chart" --strict --quiet
-  helm template "$name" "$chart" >/dev/null                       # defaults only
+  # Defaults only. A chart without usable defaults (e.g. a public URL) names the values you must
+  # set in ci/required-values.yaml; its own tests check that a render without them fails.
+  required=()
+  if [ -f "$chart/ci/required-values.yaml" ]; then required=(-f "$chart/ci/required-values.yaml"); fi
+  helm lint "$chart" --strict --quiet "${required[@]}"
+  helm template "$name" "$chart" "${required[@]}" >/dev/null
   if [ -f "$chart/ci/test-values.yaml" ]; then
     helm lint "$chart" --strict --quiet -f "$chart/ci/test-values.yaml"
     helm template "$name" "$chart" -f "$chart/ci/test-values.yaml" >/dev/null
@@ -30,4 +34,5 @@ python3 charts/home-assistant/tests/test-backup.py
 python3 charts/paperless-ngx/tests/test-admin-bootstrap.py
 python3 charts/paperless-ngx/tests/test-v3.py
 python3 charts/immich/tests/test-chart.py
+python3 charts/ocis/tests/test-chart.py
 echo "OK: all charts"

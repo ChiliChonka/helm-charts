@@ -1,0 +1,29 @@
+{{- $url := required "url is required (public URL, e.g. https://cloud.example.com)" .Values.url }}
+{{- if not (hasPrefix "https://" $url) }}
+{{- fail "url must start with https:// (TLS ends at the gateway, clients still see https)" }}
+{{- end }}
+{{- if ne (trimSuffix "/" $url) $url }}
+{{- fail "url must not end with a slash" }}
+{{- end }}
+
+{{- $o := .Values.oidc }}
+{{- if $o.enabled }}
+{{- $_ := required "oidc.issuer is required with oidc.enabled" $o.issuer }}
+{{- if not (has $o.roleAssignment.driver (list "oidc" "default")) }}
+{{- fail "oidc.roleAssignment.driver must be oidc or default" }}
+{{- end }}
+{{- else if not .Values.admin.existingSecret }}
+{{- fail "admin.existingSecret is required without OIDC: otherwise nobody knows the admin password" }}
+{{- end }}
+
+{{- range $e := .Values.extraEnv }}
+{{- if regexMatch "PASSWORD|SECRET|API_KEY" (upper $e.name) }}
+{{- if not $e.valueFrom }}
+{{- fail (printf "extraEnv %s must use a Secret reference (valueFrom), never values" $e.name) }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if and .Values.httpRoute.enabled (not .Values.httpRoute.routes) }}
+{{- fail "httpRoute.enabled needs at least one entry in httpRoute.routes" }}
+{{- end }}
