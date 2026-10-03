@@ -1,0 +1,47 @@
+{{- if not .Values.persistence.existingClaim }}
+{{- $p := .Values.persistence }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "rustical.dataClaim" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rustical.labels" . | nindent 4 }}
+  {{- with $p.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml $p.accessModes | nindent 4 }}
+  {{- with $p.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $p.size }}
+{{- end }}
+{{- if and .Values.backup.enabled (not .Values.backup.existingClaim) }}
+{{- $b := .Values.backup }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "rustical.backupClaim" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rustical.labels" . | nindent 4 }}
+  {{- with $b.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml $b.accessModes | nindent 4 }}
+  {{- with $b.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $b.size }}
+{{- end }}

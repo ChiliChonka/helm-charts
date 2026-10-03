@@ -1,0 +1,25 @@
+# Fictional render fixture; existing Secrets are not included.
+oidc:
+  enabled: true
+  issuer: https://sso.example.com/realms/example
+  existingSecret: example-rustical-oidc
+  requireGroup: family
+  assignMemberships:
+    family: [family]
+persistence:
+  storageClass: example-block
+backup:
+  enabled: true
+  storageClass: example-nfs
+httpRoute:
+  enabled: true
+  parentRef:
+    name: example-internal
+    namespace: example-gateway
+    sectionName: https
+  routes:
+    - name: dav-test
+      hostnames: [dav.example.com]
+      rules:
+        - backendRefs: [{name: dav-test, port: 4000}]
+          matches: [{path: {type: PathPrefix, value: /}}]

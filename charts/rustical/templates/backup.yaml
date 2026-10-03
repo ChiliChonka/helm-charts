@@ -1,0 +1,83 @@
+{{- if .Values.backup.enabled }}
+{{- $b := .Values.backup }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rustical.fullname" . }}-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rustical.labels" . | nindent 4 }}
+data:
+  backup.sh: |
+{{ .Files.Get "files/backup.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "rustical.fullname" . }}-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rustical.labels" . | nindent 4 }}
+spec:
+  schedule: {{ $b.schedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: rustical-backup
+            app.kubernetes.io/instance: {{ .Release.Name }}
+          annotations:
+            checksum/script: {{ .Files.Get "files/backup.sh" | sha256sum }}
+        spec:
+          restartPolicy: Never
+          enableServiceLinks: false
+          {{- with .Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if $b.sameNodeAsApp }}
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      {{- include "rustical.selectorLabels" . | nindent 22 }}
+          {{- end }}
+          containers:
+            - name: backup
+              image: "{{ $b.image.repository }}:{{ $b.image.tag }}"
+              command: [sh, /scripts/backup.sh]
+              env:
+                - {name: DB, value: /data/db.sqlite3}
+                - {name: OUT, value: /backup}
+              {{- with $b.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with $.Values.securityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                # read-write: the SQLite backup API needs the -shm file next to the database
+                - {name: data, mountPath: /data}
+                - {name: backup, mountPath: /backup}
+                - {name: scripts, mountPath: /scripts, readOnly: true}
+                - {name: tmp, mountPath: /tmp}
+          volumes:
+            - name: data
+              persistentVolumeClaim: {claimName: {{ include "rustical.dataClaim" . }}}
+            - name: backup
+              persistentVolumeClaim: {claimName: {{ include "rustical.backupClaim" . }}}
+            - name: scripts
+              configMap: {name: {{ include "rustical.fullname" . }}-backup}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

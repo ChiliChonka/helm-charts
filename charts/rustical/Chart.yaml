@@ -1,0 +1,9 @@
+apiVersion: v2
+name: rustical-helm-chart
+description: RustiCal CalDAV/CardDAV server with OIDC, a persistent volume, a readable nightly backup and Gateway API
+type: application
+version: 0.1.0
+appVersion: "0.16.4"
+home: https://lennart-k.github.io/rustical/
+sources:
+  - https://github.com/lennart-k/rustical

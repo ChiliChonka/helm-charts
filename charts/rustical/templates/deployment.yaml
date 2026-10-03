@@ -1,0 +1,101 @@
+{{- /*
+  One pod, Recreate: SQLite on a ReadWriteOnce volume.
+  enableServiceLinks: false — otherwise Kubernetes injects RUSTICAL_* variables for a Service
+  called "rustical", and RustiCal refuses to start (upstream docs, issue #122).
+*/ -}}
+{{- $o := .Values.oidc }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rustical.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rustical.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "rustical.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rustical.labels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: rustical
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            # The default [::]:4000 fails on nodes without IPv6. (http.host/port are deprecated.)
+            - {name: RUSTICAL_HTTP__BIND, value: "0.0.0.0:4000"}
+            - {name: RUSTICAL_FRONTEND__ALLOW_PASSWORD_LOGIN, value: {{ and .Values.allowPasswordLogin (not $o.enabled) | quote }}}
+            {{- if $o.enabled }}
+            - {name: RUSTICAL_OIDC__NAME, value: {{ $o.name | quote }}}
+            - {name: RUSTICAL_OIDC__ISSUER, value: {{ $o.issuer | quote }}}
+            - {name: RUSTICAL_OIDC__CLIENT_ID, value: {{ $o.clientId | quote }}}
+            - name: RUSTICAL_OIDC__CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: {{ $o.existingSecret | quote }}, key: {{ $o.secretKey | quote }}}
+            - {name: RUSTICAL_OIDC__CLAIM_USERID, value: {{ $o.claimUserid | quote }}}
+            - {name: RUSTICAL_OIDC__SCOPES, value: {{ toJson $o.scopes | quote }}}
+            - {name: RUSTICAL_OIDC__ALLOW_SIGN_UP, value: {{ $o.allowSignUp | quote }}}
+            {{- with $o.requireGroup }}
+            - {name: RUSTICAL_OIDC__REQUIRE_GROUP, value: {{ . | quote }}}
+            {{- end }}
+            {{- range $group, $principals := $o.assignMemberships }}
+            - {name: {{ printf "RUSTICAL_OIDC__ASSIGN_MEMBERSHIPS__%s" $group | quote }}, value: {{ toJson $principals | quote }}}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - {name: http, containerPort: 4000, protocol: TCP}
+          # /ping is what `rustical health` checks.
+          startupProbe:
+            httpGet: {path: /ping, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /ping, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /ping, port: http}
+            periodSeconds: 20
+            failureThreshold: 6
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/rustical}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: {{ include "rustical.dataClaim" . }}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,26 @@
+{{- $o := .Values.oidc }}
+{{- if $o.enabled }}
+{{- $_ := required "oidc.issuer is required with oidc.enabled" $o.issuer }}
+{{- $_ := required "oidc.existingSecret is required with oidc.enabled (client secret, never in values)" $o.existingSecret }}
+{{- if not (has $o.claimUserid (list "preferred_username" "email" "sub")) }}
+{{- fail "oidc.claimUserid must be preferred_username, email or sub" }}
+{{- end }}
+{{- range $group, $principals := $o.assignMemberships }}
+{{- if not (regexMatch "^[A-Za-z0-9_.-]+$" $group) }}
+{{- fail (printf "oidc.assignMemberships key %q: only letters, digits, . _ - (used in an environment variable name)" $group) }}
+{{- end }}
+{{- if not (kindIs "slice" $principals) }}
+{{- fail (printf "oidc.assignMemberships.%s must be a list of group principals" $group) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range $e := .Values.extraEnv }}
+{{- if regexMatch "PASSWORD|SECRET|TOKEN" (upper $e.name) }}
+{{- if not $e.valueFrom }}
+{{- fail (printf "extraEnv %s must use a Secret reference (valueFrom), never values" $e.name) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if and .Values.httpRoute.enabled (not .Values.httpRoute.routes) }}
+{{- fail "httpRoute.enabled needs at least one entry in httpRoute.routes" }}
+{{- end }}
