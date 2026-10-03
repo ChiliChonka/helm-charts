@@ -50,13 +50,42 @@ Required values: `url`, plus either `oidc.*` or `admin.existingSecret` (the mini
   `blobs/` with the content stored under IDs instead of names, and `trash/`. `data` holds the
   user directory (`idm`), shares and settings (`storage/metadata`, a system space), the search
   index and NATS. Without `files` enabled, all of it is on `data`.
-- **Back up all volumes together.** The spaces alone are not a readable archive (content is
+- **To get the files out without oCIS**, the files root alone is enough (next section).
+- **Back up all volumes together** to restore oCIS itself. The spaces alone are not a readable archive (content is
   stored by ID), and without `data` accounts, shares and roles are gone; without `ocis.yaml`
   nothing can be opened again. A consistent copy needs the pod stopped (or snapshots of all
   volumes at the same moment).
 - Decide on `files` before the first start; oCIS does not move existing spaces.
 - **NFS:** `fsGroup` does not apply, the export must let uid 1000 write. Never put `data` on
   NFS (bolt and the index rely on locks and mmap).
+
+## Getting the files out (without oCIS)
+
+oCIS stores content under IDs, not names, so a copy of the volume is not a folder you can browse.
+[`tools/ocis-export.py`](tools/ocis-export.py) turns it back into plain folders **without a
+running oCIS** — from the NAS folder, a restored backup or a copied volume. Python 3 only, no
+packages:
+
+```sh
+python3 tools/ocis-export.py <storage-root> <empty-target> [--versions] [--trash]
+```
+
+- `<storage-root>` is the folder containing `spaces/` (the `files` volume; without it
+  `/var/lib/ocis/storage/users` on the data volume).
+- One folder per space (`personal - <name>`, project spaces by name) with the real file and
+  folder names and modification times. Every file is checked against its stored SHA-1; the
+  summary counts `checked` files, and any mismatch or missing content ends with exit code 1.
+- `--versions` adds older versions under `_versions/`, `--trash` the trash bin under `_trash/`.
+- Reads only the metadata files (`*.mpk`), not the symlinks: rclone skips symlinks by default.
+  `ocis.yaml` and the data volume are **not** needed for this.
+- Not exported: shares, links, accounts (they live on the data volume and mean nothing without
+  oCIS). The time of a folder that never changed comes from the folder itself and is lost if
+  the backup did not keep folder times.
+
+Tested against a real oCIS 8.2.1 storage (`tests/fixtures/`): paths, content and times equal
+what oCIS serves over WebDAV for the same data, also with all symlinks removed; corrupted or
+missing content is reported. Re-check after oCIS upgrades that change the storage format
+(`tests/test-export.py`; build a new fixture from a test pod).
 
 ## Keycloak / OIDC
 
