@@ -35,4 +35,5 @@ python3 charts/paperless-ngx/tests/test-admin-bootstrap.py
 python3 charts/paperless-ngx/tests/test-v3.py
 python3 charts/immich/tests/test-chart.py
 python3 charts/ocis/tests/test-chart.py
+python3 charts/ocis/tests/test-export.py
 echo "OK: all charts"
