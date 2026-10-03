@@ -1,0 +1,108 @@
+# RustiCal: CalDAV/CardDAV server, one Rust binary, data in one SQLite database.
+# Never put passwords or client secrets in values.
+
+image:
+  repository: ghcr.io/lennart-k/rustical
+  tag: "0.16.4"
+  pullPolicy: IfNotPresent
+
+# Login to the web frontend with an OpenID Connect provider (e.g. Keycloak). Calendar apps then
+# use app tokens: DAVx5 gets one through the Nextcloud login flow, Apple devices through a
+# configuration profile from the frontend.
+oidc:
+  enabled: false
+  # Button label on the login page.
+  name: Keycloak
+  # e.g. https://sso.example.com/realms/EXAMPLE
+  issuer: ""
+  clientId: rustical
+  # Confidential client: the secret comes from an existing Secret.
+  existingSecret: ""
+  secretKey: client-secret
+  # User ID in RustiCal: preferred_username, email or sub. Must not contain ":" or "$".
+  claimUserid: preferred_username
+  scopes: [openid, profile]
+  # Only members of this group (from the token's "groups" claim) may log in. Empty = everyone.
+  requireGroup: ""
+  # Create the RustiCal user on the first login.
+  allowSignUp: true
+  # IdP group -> RustiCal group principals the user joins on login (e.g. a shared family
+  # calendar). The group principals must exist (`rustical principals create <id>
+  # --principal-type group`). Memberships are only added, never removed.
+  assignMemberships: {}
+  # assignMemberships:
+  #   family: [family]
+
+# Password login in the frontend. Switched off automatically with oidc.enabled.
+allowPasswordLogin: true
+
+# Additional environment variables (list of EnvVar, names start with RUSTICAL_). Anything named
+# *PASSWORD*, *SECRET* or *TOKEN* must come from a Secret (valueFrom).
+extraEnv: []
+
+persistence:
+  # /var/lib/rustical with db.sqlite3. Block storage: SQLite needs working locks, never NFS.
+  existingClaim: ""
+  size: 1Gi
+  storageClass: ""
+  accessModes: [ReadWriteOnce]
+  annotations:
+    helm.sh/resource-policy: keep
+
+resources:
+  requests: {cpu: 20m, memory: 32Mi}
+  limits: {memory: 256Mi}
+
+# The image is "FROM scratch" (no shell, no user); run it unprivileged.
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  runAsNonRoot: true
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
+
+# Map hostnames the pod cannot resolve (e.g. the OIDC issuer) to an address. Normally cluster DNS
+# forwards to a resolver that knows them.
+hostAliases: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Nightly backup into a second volume (e.g. on a NAS): a consistent copy of the database and
+# every live calendar/address book as an importable .ics/.vcf file (files/backup.sh).
+backup:
+  enabled: false
+  # Standard cron (five fields), UTC.
+  schedule: "0 3 * * *"
+  image:
+    repository: docker.io/alpine/sqlite
+    tag: "3.53.4"
+  # Target volume: existing claim, or one created by the chart.
+  existingClaim: ""
+  size: 1Gi
+  storageClass: ""
+  accessModes: [ReadWriteMany]
+  annotations:
+    helm.sh/resource-policy: keep
+  # The data volume is ReadWriteOnce: the job must run on the node where RustiCal runs.
+  sameNodeAsApp: true
+  resources:
+    requests: {cpu: 10m, memory: 16Mi}
+    limits: {memory: 128Mi}
+
+# Shared Gateway terminates TLS; RustiCal speaks plain HTTP on 4000. The Service is <release>.
+httpRoute:
+  enabled: false
+  parentRef: {}
+  routes: []
+  # routes:
+  #   - name: rustical
+  #     hostnames: [dav.example.com]
+  #     rules:
+  #       - backendRefs: [{name: rustical, port: 4000}]
+  #         matches: [{path: {type: PathPrefix, value: /}}]

@@ -15,4 +15,5 @@ jobs:
       - uses: actions/checkout@v7
       - uses: azure/setup-helm@v5
       - run: pip install pyyaml
+      - run: sudo apt-get update -q && sudo apt-get install -y -q sqlite3   # rustical backup tests
       - run: ./scripts/check.sh
