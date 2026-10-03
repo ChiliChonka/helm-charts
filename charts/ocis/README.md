@@ -40,14 +40,20 @@ Required values: `url`, plus either `oidc.*` or `admin.existingSecret` (the mini
 | Volume | Path | Content | Storage |
 |---|---|---|---|
 | `config` | `/etc/ocis` | `ocis.yaml` with all internal secrets | block, 1 GiB |
-| `data` | `/var/lib/ocis` | user directory, NATS, search index, thumbnails, files unless `files` is on | block |
-| `files` (optional) | `/var/lib/ocis-files` | only the user files (spaces), `STORAGE_USERS_OCIS_ROOT` | e.g. NFS |
+| `data` | `/var/lib/ocis` | user directory, shares and settings, NATS, search index, thumbnails; the spaces too unless `files` is on | block |
+| `files` (optional) | `/var/lib/ocis-files` | the user spaces: content and their metadata, `STORAGE_USERS_OCIS_ROOT` | e.g. NFS |
 
 - Claims created by the chart keep `helm.sh/resource-policy: keep`; `existingClaim` takes over
   an existing one.
-- **Back up `config` and `data` together.** The files are useless without the metadata in
-  `data`, and without `ocis.yaml` none of it can be opened again. A consistent copy needs the
-  pod stopped (or snapshots of all volumes at the same moment).
+- **What lives where** (measured with 8.2.1): each space is complete in the files root — `nodes/`
+  with one `.mpk` metadata file per file/folder (name, parent, size, checksum, versions),
+  `blobs/` with the content stored under IDs instead of names, and `trash/`. `data` holds the
+  user directory (`idm`), shares and settings (`storage/metadata`, a system space), the search
+  index and NATS. Without `files` enabled, all of it is on `data`.
+- **Back up all volumes together.** The spaces alone are not a readable archive (content is
+  stored by ID), and without `data` accounts, shares and roles are gone; without `ocis.yaml`
+  nothing can be opened again. A consistent copy needs the pod stopped (or snapshots of all
+  volumes at the same moment).
 - Decide on `files` before the first start; oCIS does not move existing spaces.
 - **NFS:** `fsGroup` does not apply, the export must let uid 1000 write. Never put `data` on
   NFS (bolt and the index rely on locks and mmap).
