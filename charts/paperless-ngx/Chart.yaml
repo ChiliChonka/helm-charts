@@ -2,8 +2,8 @@ apiVersion: v2
 name: paperless-ngx
 description: Paperless-ngx is a community-supported open-source document management system that transforms your physical documents into a searchable online archive so you can keep, well, less paper. This is an umbrella chart to setup paperless-ngx.
 type: application
-version: 0.4.3
-appVersion: "3.2.1"
+version: 0.4.4
+appVersion: "3.3.4"
 
 dependencies:
   - name: tika
@@ -11,11 +11,11 @@ dependencies:
     repository: https://apache.jfrog.io/artifactory/tika
     condition: tika.enabled    
   - name: gotenberg
-    version: 1.25.0
+    version: 1.29.0
     repository: https://maikumori.github.io/helm-charts
     condition: gotenberg.enabled    
   # Webserver is the paperless-ngx itself. No repository given, while it's already laying in the charts sub directory.
   - name: paperless-ngx
-    version: 0.1.6
+    version: 0.1.7
     repository: ""
     condition: paperless-ngx.enabled    

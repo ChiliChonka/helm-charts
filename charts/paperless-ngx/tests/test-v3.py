@@ -28,7 +28,7 @@ def one(docs, kind, name):
 
 docs = render()
 container = one(docs, 'Deployment', 'paperless-ngx')['spec']['template']['spec']['containers'][0]
-assert container['image'].endswith(':3.2.1'), container['image']
+assert container['image'].endswith(':3.3.4'), container['image']
 
 # Secret key: from the generated Secret, never from the ConfigMap.
 secret_env = [e for e in container['env'] if e['name'] == 'PAPERLESS_SECRET_KEY']
@@ -66,7 +66,7 @@ for mode in ['skip', 'skip_noarchive']:
 assert one(render('--set-string', 'paperless-ngx.paperlessVars.PAPERLESS_OCR_MODE=auto'),
            'ConfigMap', 'paperless-ngx-configuration')['data']['PAPERLESS_OCR_MODE'] == 'auto'
 
-print(f'PASS: image 3.2.1, secret key from Secret, {len(new)} new settings rendered, '
+print(f'PASS: image 3.3.4, secret key from Secret, {len(new)} new settings rendered, '
       f'{len(removed) + 2} removed settings rejected')
 
 # startupProbe: absent by default, rendered when configured.
