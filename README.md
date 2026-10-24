@@ -10,7 +10,7 @@ to S3, an `HTTPRoute` for the Gateway API, and optionally data from an NFS expor
 | `home-assistant-helm-chart` | [`charts/home-assistant`](charts/home-assistant) | [Home Assistant](https://www.home-assistant.io), upstream [pajikos](https://github.com/pajikos/home-assistant-helm-chart) | — | CloudNativePG (recorder DB) + Barman plugin, NFS, Gateway API |
 | `paperless-ngx` | [`charts/paperless-ngx`](charts/paperless-ngx) | [paperless-ngx](https://docs.paperless-ngx.com) 3.3 with Tika and Gotenberg | CloudNativePG, redis-operator | Barman plugin, Gateway API |
 | `immich-helm-chart` | [`charts/immich`](charts/immich) | [Immich](https://immich.app) 3.3.5, official upstream chart | PostgreSQL with VectorChord, Redis, library PVC | CloudNativePG, redis-operator, Barman plugin, Gateway API |
-| `ocis-helm-chart` | [`charts/ocis`](charts/ocis) | [ownCloud Infinite Scale](https://owncloud.dev/ocis/) 8.2.1, single binary, own chart | — (no database, no cache) | OIDC (Keycloak), NFS for files, Gateway API |
+| `ocis-helm-chart` | [`charts/ocis`](charts/ocis) | [ownCloud Infinite Scale](https://owncloud.dev/ocis/) 8.2.2, single binary, own chart | — (no database, no cache) | OIDC (Keycloak), NFS for files, Gateway API |
 | `rustical-helm-chart` | [`charts/rustical`](charts/rustical) | [RustiCal](https://github.com/lennart-k/rustical) 0.16.7 (CalDAV/CardDAV), own chart | — (SQLite) | OIDC (Keycloak), nightly readable backup, Gateway API |
 
 Why the charts build on operators instead of bundled subcharts, and how to install them (order,
