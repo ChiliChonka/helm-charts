@@ -1,6 +1,6 @@
 # ownCloud Infinite Scale (oCIS)
 
-Own chart for [oCIS](https://github.com/owncloud/ocis) **8.2.1** as a single binary
+Own chart for [oCIS](https://github.com/owncloud/ocis) **8.2.2** as a single binary
 (`ocis server`): one pod runs all services with the embedded NATS, user directory (IDM) and
 search index. Persistent volumes, optional Keycloak/OIDC login and an HTTPRoute for the Gateway
 API. No cluster-wide resources and no credentials are created.
