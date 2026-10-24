@@ -5,7 +5,7 @@ with optional CloudNativePG, Barman Cloud backups, OT-CONTAINER-KIT Redis, a lib
 HTTPRoute. Operators, Gateway and StorageClasses are prerequisites; see
 [platform setup](../../docs/operators.md). No cluster-wide resources or credentials are created.
 
-Verified upstream versions on 2026-10-12: chart **0.13.4**, server and machine-learning **v3.3.1**.
+Verified upstream versions on 2026-10-24: chart **0.13.4**, server and machine-learning **v3.3.5**.
 Official images: `ghcr.io/immich-app/immich-server` and `ghcr.io/immich-app/immich-machine-learning`.
 The chart is distributed through OCI; its old HTTP repository is no longer updated. Container
 tags are pinned independently of the upstream chart.
@@ -38,7 +38,7 @@ history, even when configurationKind is Secret.
 
 ## Storage and database
 
-- **Media:** Immich v3.3.1 needs a filesystem at `/data`; there is no native S3 primary media
+- **Media:** Immich v3.3.5 needs a filesystem at `/data`; there is no native S3 primary media
   backend. Use an existing PVC or create one through NFS CSI. Keep `IMMICH_MEDIA_LOCATION`
   unchanged. The library claim has a Helm keep annotation; the StorageClass must also retain
   its PV and NFS directory. NFS PVC capacity is not a NAS quota.
@@ -189,7 +189,7 @@ route wiring, persistence, bootstrap, backup references, server-only credentials
 config mounting, UI-managed settings and invalid combinations. They do not prove operator reconciliation, NFS
 permissions, migrations or OIDC login; those require a staging rollout.
 
-- [Kubernetes](https://docs.immich.app/install/kubernetes/), [chart 0.13.4](https://github.com/immich-app/immich-charts/tree/immich-0.13.4), [app v3.3.1](https://github.com/immich-app/immich/releases/tag/v3.3.1)
+- [Kubernetes](https://docs.immich.app/install/kubernetes/), [chart 0.13.4](https://github.com/immich-app/immich-charts/tree/immich-0.13.4), [app v3.3.5](https://github.com/immich-app/immich/releases/tag/v3.3.5)
 - [Environment variables](https://docs.immich.app/install/environment-variables/), [config file](https://docs.immich.app/install/config-file/), [OIDC](https://docs.immich.app/administration/oauth/)
 - [PostgreSQL](https://docs.immich.app/administration/postgres-standalone/), [CNPG images](https://github.com/tensorchord/cloudnative-vectorchord)
 - [Reverse proxy](https://docs.immich.app/administration/reverse-proxy/), [primary S3 storage discussion](https://github.com/immich-app/immich/discussions/1683)

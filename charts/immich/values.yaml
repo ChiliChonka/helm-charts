@@ -7,7 +7,7 @@ immich:
       containers:
         main:
           image:
-            tag: v3.3.1
+            tag: v3.3.5
   immich:
     persistence:
       library:
