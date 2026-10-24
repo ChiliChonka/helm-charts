@@ -1,6 +1,6 @@
 # RustiCal
 
-Own chart for [RustiCal](https://github.com/lennart-k/rustical) **0.16.4**, a CalDAV/CardDAV
+Own chart for [RustiCal](https://github.com/lennart-k/rustical) **0.16.7**, a CalDAV/CardDAV
 server written in Rust: one binary, data in one SQLite database. Login through an OpenID Connect
 provider, app tokens for calendar apps, group calendars, an optional nightly backup with readable
 `.ics`/`.vcf` files, and an HTTPRoute for the Gateway API.

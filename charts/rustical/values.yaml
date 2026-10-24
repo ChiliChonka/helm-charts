@@ -3,7 +3,7 @@
 
 image:
   repository: ghcr.io/lennart-k/rustical
-  tag: "0.16.4"
+  tag: "0.16.7"
   pullPolicy: IfNotPresent
 
 # Login to the web frontend with an OpenID Connect provider (e.g. Keycloak). Calendar apps then
