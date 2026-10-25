@@ -2,7 +2,7 @@ apiVersion: v2
 name: immich-helm-chart
 description: Immich with optional CloudNativePG, Redis operator, library PVC and Gateway API resources
 type: application
-version: 0.2.1
+version: 0.3.0
 appVersion: "v3.3.5"
 home: https://immich.app
 dependencies:

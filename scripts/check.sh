@@ -38,4 +38,5 @@ python3 charts/ocis/tests/test-chart.py
 python3 charts/ocis/tests/test-export.py
 python3 charts/rustical/tests/test-chart.py
 python3 charts/rustical/tests/test-backup.py
+python3 scripts/test-networkpolicy.py
 echo "OK: all charts"

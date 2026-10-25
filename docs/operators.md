@@ -185,6 +185,21 @@ one operator, instances in the apps' namespaces):
 - Keep CRDs and ClusterRoles out of any Helm release that might be deleted: they would take every
   Keycloak CR with them.
 
+## NetworkPolicies (optional)
+
+`immich`, `paperless-ngx` and `home-assistant` can restrict who reaches their database and Redis
+(`networkPolicy.enabled`, off by default). Allowed: pods of the release namespace (app, jobs,
+replication) and the operators — CloudNativePG queries the instance status on port 8000, so
+`networkPolicy.cnpgOperatorNamespace` (and `redisOperatorNamespace`) must name the namespaces
+your operators run in. Egress is not restricted. The policies only take effect with a CNI that
+enforces them (Cilium, Calico; not Flannel).
+
+Home Assistant usually runs with `hostNetwork`: its connections come from the node, which a
+plain NetworkPolicy cannot select. With Cilium, `networkPolicy.ciliumHostNetworkClients: true`
+adds a CiliumNetworkPolicy that opens the Postgres port for the entities `host` and
+`remote-node`. Without it, Home Assistant loses its database as soon as it and the database run
+on different nodes.
+
 ## Ingress: Gateway API
 
 The charts are exposed through an `HTTPRoute` (`httpRoute.*`), not an Ingress. Tested with

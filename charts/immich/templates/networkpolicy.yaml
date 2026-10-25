@@ -1,0 +1,53 @@
+{{- /*
+  Ingress restrictions for the database and Redis (TASK-390 in club-combat-board). Off by default: they
+  only work with a CNI that enforces NetworkPolicies (e.g. Cilium, Calico), and the operator
+  namespaces must match your cluster.
+
+  - Pods of the release namespace: the app, its jobs, backups such as pg_dump jobs and the other
+    database instances (replication).
+  - The CloudNativePG operator queries the instance status (port 8000); without it the cluster
+    is no longer reported healthy.
+  - Redis: only the release namespace and the Redis operator.
+  - Egress stays open (backups to object storage).
+*/ -}}
+{{- if and .Values.networkPolicy.enabled .Values.cnpg.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.cnpg.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: {{ .Values.cnpg.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "networkPolicy.cnpgOperatorNamespace is required" .Values.networkPolicy.cnpgOperatorNamespace }}
+{{- end }}
+{{- if and .Values.networkPolicy.enabled .Values.redisOperator.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.redisOperator.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.redisOperator.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "networkPolicy.redisOperatorNamespace is required" .Values.networkPolicy.redisOperatorNamespace }}
+{{- end }}
