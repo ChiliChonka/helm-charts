@@ -60,3 +60,10 @@ httpRoute:
   enabled: false
   parentRef: {}
   routes: []
+
+# Ingress restrictions for the database and Redis: only pods of the release namespace and the operators
+# (templates/networkpolicy.yaml). Needs a CNI that enforces NetworkPolicies.
+networkPolicy:
+  enabled: false
+  cnpgOperatorNamespace: cnpg-system
+  redisOperatorNamespace: redis-operator

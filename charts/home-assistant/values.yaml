@@ -122,3 +122,12 @@ cnpg:
     regionKey: ""
     retentionPolicy: "30d"
     schedule: "0 0 2 * * *"   # 6 fields, with seconds
+
+# Ingress restrictions for the database: only pods of the release namespace and the operators
+# (templates/networkpolicy.yaml). Needs a CNI that enforces NetworkPolicies.
+networkPolicy:
+  enabled: false
+  cnpgOperatorNamespace: cnpg-system
+  # Home Assistant with hostNetwork reaches its database from the node, which a NetworkPolicy
+  # cannot express. true = an additional CiliumNetworkPolicy for the node entities (needs Cilium).
+  ciliumHostNetworkClients: false

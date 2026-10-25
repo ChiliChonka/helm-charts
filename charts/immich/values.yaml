@@ -170,3 +170,10 @@ httpRoute:
   #       - backendRefs: [{name: immich-server, port: 2283}]
   #         matches: [{path: {type: PathPrefix, value: /}}]
   #         timeouts: {request: 3600s}
+
+# Ingress restrictions for the database and Redis: only pods of the release namespace and the operators
+# (templates/networkpolicy.yaml). Needs a CNI that enforces NetworkPolicies.
+networkPolicy:
+  enabled: false
+  cnpgOperatorNamespace: cnpg-system
+  redisOperatorNamespace: redis-operator

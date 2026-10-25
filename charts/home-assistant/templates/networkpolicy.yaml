@@ -1,0 +1,55 @@
+{{- /*
+  Ingress restrictions for the database (TASK-390 in club-combat-board). Off by default: they
+  only work with a CNI that enforces NetworkPolicies (e.g. Cilium, Calico), and the operator
+  namespaces must match your cluster.
+
+  - Pods of the release namespace: the app, its jobs, backups such as pg_dump jobs and the other
+    database instances (replication).
+  - The CloudNativePG operator queries the instance status (port 8000); without it the cluster
+    is no longer reported healthy.
+  - Optional: Home Assistant in hostNetwork (Cilium only, see below).
+  - Egress stays open (backups to object storage).
+*/ -}}
+{{- if and .Values.networkPolicy.enabled .Values.cnpg.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.cnpg.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: {{ .Values.cnpg.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "networkPolicy.cnpgOperatorNamespace is required" .Values.networkPolicy.cnpgOperatorNamespace }}
+{{- end }}
+{{- if and .Values.networkPolicy.enabled .Values.cnpg.enabled .Values.networkPolicy.ciliumHostNetworkClients }}
+---
+# Home Assistant usually runs with hostNetwork: its connections come from the node, not from a
+# pod, and a NetworkPolicy cannot select node traffic. Cilium identifies it as the entities
+# `host` (same node) and `remote-node` (another node). Allowed: only the Postgres port.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Values.cnpg.name }}-host-network
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: {{ .Values.cnpg.name }}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+{{- end }}
