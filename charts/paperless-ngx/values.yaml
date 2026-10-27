@@ -66,4 +66,7 @@ httpRoute:
 networkPolicy:
   enabled: false
   cnpgOperatorNamespace: cnpg-system
+  # Namespace of a metrics collector (Prometheus, Alloy, …) allowed to scrape the Postgres
+  # exporter on port 9187. Empty: no such rule.
+  metricsNamespace: ""
   redisOperatorNamespace: redis-operator
