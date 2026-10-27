@@ -128,6 +128,9 @@ cnpg:
 networkPolicy:
   enabled: false
   cnpgOperatorNamespace: cnpg-system
+  # Namespace of a metrics collector (Prometheus, Alloy, …) allowed to scrape the Postgres
+  # exporter on port 9187. Empty: no such rule.
+  metricsNamespace: ""
   # Home Assistant with hostNetwork reaches its database from the node, which a NetworkPolicy
   # cannot express. true = an additional CiliumNetworkPolicy for the node entities (needs Cilium).
   ciliumHostNetworkClients: false

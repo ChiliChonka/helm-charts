@@ -7,6 +7,8 @@
     database instances (replication).
   - The CloudNativePG operator queries the instance status (port 8000); without it the cluster
     is no longer reported healthy.
+  - Optional: the namespace of your metrics collector reads the Postgres exporter (port 9187),
+    nothing else (networkPolicy.metricsNamespace, empty = no rule).
   - Redis: only the release namespace and the Redis operator.
   - Egress stays open (backups to object storage).
 */ -}}
@@ -29,6 +31,15 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: {{ required "networkPolicy.cnpgOperatorNamespace is required" .Values.networkPolicy.cnpgOperatorNamespace }}
+    {{- with .Values.networkPolicy.metricsNamespace }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 9187
+    {{- end }}
 {{- end }}
 {{- if and .Values.networkPolicy.enabled .Values.redisOperator.enabled }}
 ---

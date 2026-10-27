@@ -71,6 +71,17 @@ for chart, cfg in CHARTS.items():
         result = render(chart, "--set", "networkPolicy.enabled=true", "--set", "networkPolicy.redisOperatorNamespace=")
         assert result.returncode != 0 and "redisOperatorNamespace is required" in result.stderr, (chart, result.stderr)
 
+    # Metrics collector: no rule by default, with a namespace exactly port 9187 from there.
+    assert all("ports" not in rule for rule in policies[cfg["db"]]["spec"]["ingress"]), (chart, db)
+    metrics = {p["metadata"]["name"]: p for p in docs(render(chart, "--set", "networkPolicy.enabled=true",
+                                                          "--set", "networkPolicy.metricsNamespace=monitoring"), "NetworkPolicy")}
+    rules = metrics[cfg["db"]]["spec"]["ingress"]
+    assert len(rules) == 3, (chart, rules)
+    assert rules[2] == {"from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "monitoring"}}}],
+                        "ports": [{"protocol": "TCP", "port": 9187}]}, (chart, rules[2])
+    if cfg["redis"]:
+        assert metrics[cfg["redis"]] == policies[cfg["redis"]], chart
+
     result = render(chart, "--set", "networkPolicy.enabled=true", "--set", "networkPolicy.cnpgOperatorNamespace=")
     assert result.returncode != 0 and "cnpgOperatorNamespace is required" in result.stderr, (chart, result.stderr)
 

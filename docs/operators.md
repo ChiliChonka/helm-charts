@@ -191,7 +191,8 @@ one operator, instances in the apps' namespaces):
 (`networkPolicy.enabled`, off by default). Allowed: pods of the release namespace (app, jobs,
 replication) and the operators — CloudNativePG queries the instance status on port 8000, so
 `networkPolicy.cnpgOperatorNamespace` (and `redisOperatorNamespace`) must name the namespaces
-your operators run in. Egress is not restricted. The policies only take effect with a CNI that
+your operators run in. `networkPolicy.metricsNamespace` (empty by default) additionally lets
+that namespace scrape the Postgres exporter on port 9187, and nothing else. Egress is not restricted. The policies only take effect with a CNI that
 enforces them (Cilium, Calico; not Flannel).
 
 Home Assistant usually runs with `hostNetwork`: its connections come from the node, which a
