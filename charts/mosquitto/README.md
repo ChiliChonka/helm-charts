@@ -1,0 +1,33 @@
+# Mosquitto
+
+Own chart for [Eclipse Mosquitto](https://mosquitto.org) **2.1.2**: one broker, a persistent
+volume, passwords from an existing Secret and probes you can set. It replaces `t3n/mosquitto`
+2.4.1 in place: object names, selectors and the volume stay the same, so `helm upgrade` of a
+release named `mosquitto` keeps the data.
+
+## Install
+
+```sh
+helm template mosquitto charts/mosquitto -n mosquitto -f /path/to/private-values.yaml
+helm upgrade --install mosquitto charts/mosquitto -n mosquitto --create-namespace -f /path/to/private-values.yaml
+```
+
+Defaults render a broker that refuses everyone: `allow_anonymous false` and no password file.
+[ci/test-values.yaml](ci/test-values.yaml) shows a fictional setup with passwords.
+
+## Things that bite
+
+- **Passwords:** `config` is written as is. With `auth.existingSecret`, name the file in the
+  config yourself: `password_file /etc/mosquitto/auth/passwordfile`.
+- **Why an init container:** Mosquitto 2.1 refuses a symlink, which is what a Secret mount is, and
+  warns that future versions will refuse a file not owned by `mosquitto`, which is what a Secret
+  mount with `subPath` is. The init container copies the file into a memory-backed `emptyDir` as
+  uid 1883, with no capabilities. It reads the `0440` Secret through `fsGroup: 1883`; leave
+  that set.
+- **Changed Secret:** the copy happens at pod start, and the broker reads the file only then.
+  Restart the pod after a change.
+- **Probes and the log:** each TCP probe is a connection and two log lines. The old chart probed
+  every second and every three seconds, about 230,000 lines a day; the defaults here make about
+  17,000.
+- **Websocket port:** the default probes use port `websocket`. If you remove that listener from
+  `config`, point the probes at `mqtt`.
