@@ -1,0 +1,9 @@
+apiVersion: v2
+name: mosquitto-helm-chart
+description: Eclipse Mosquitto MQTT broker with an external password file, adjustable probes and a persistent volume
+type: application
+version: 0.1.0
+appVersion: "2.1.2"
+home: https://mosquitto.org
+sources:
+  - https://github.com/eclipse-mosquitto/mosquitto

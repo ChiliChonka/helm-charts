@@ -1,0 +1,107 @@
+{{- $uid := 1883 -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mosquitto.fullname" . }}
+  labels: {{- include "mosquitto.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # One broker with an RWO volume: the old pod has to go first.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "mosquitto.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "mosquitto.selector" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print .Template.BasePath "/configmap.yaml") . | sha256sum | trunc 63 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mosquitto.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.auth.existingSecret }}
+      initContainers:
+        - name: copy-auth
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [sh, -ec]
+          args:
+            - cp /secret/passwordfile /auth/passwordfile && chmod 0400 /auth/passwordfile
+          securityContext:
+            runAsUser: {{ $uid }}
+            runAsGroup: {{ $uid }}
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: auth-secret, mountPath: /secret, readOnly: true}
+            - {name: auth, mountPath: /auth}
+      {{- end }}
+      containers:
+        - name: mosquitto
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            {{- range $name, $port := .Values.ports }}
+            - name: {{ $name }}
+              containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /mosquitto/config/mosquitto.conf
+              subPath: mosquitto.conf
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath }}
+            {{- if .Values.auth.existingSecret }}
+            - name: auth
+              mountPath: {{ .Values.auth.mountPath }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "mosquitto.fullname" . }}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "mosquitto.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.auth.existingSecret }}
+        - name: auth-secret
+          secret:
+            secretName: {{ .Values.auth.existingSecret }}
+            defaultMode: 0440
+            items:
+              - {key: {{ .Values.auth.secretKey }}, path: passwordfile}
+        - name: auth
+          emptyDir: {medium: Memory, sizeLimit: 1Mi}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
