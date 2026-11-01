@@ -24,10 +24,14 @@ Defaults render a broker that refuses everyone: `allow_anonymous false` and no p
   mount with `subPath` is. The init container copies the file into a memory-backed `emptyDir` as
   uid 1883, with no capabilities. It reads the `0440` Secret through `fsGroup: 1883`; leave
   that set.
+- **ACLs:** `acl` holds the file, and `config` must name it: `acl_file /etc/mosquitto/auth/aclfile`.
+  A pattern rule such as `pattern readwrite %u/#` applies to every user. Publishing a denied topic
+  fails silently for MQTT 3.1.1 clients, so test each client, not just the connection.
 - **Changed Secret:** the copy happens at pod start, and the broker reads the file only then.
   Restart the pod after a change.
 - **Probes and the log:** each TCP probe is a connection and two log lines. The old chart probed
   every second and every three seconds, about 230,000 lines a day; the defaults here make about
-  17,000.
+  46,000. A long readiness period saves little and costs a lot: the Service gets the pod only after
+  the first success, so 30 s meant 35 s of downtime on a restart with a broker up after 3 s.
 - **Websocket port:** the default probes use port `websocket`. If you remove that listener from
   `config`, point the probes at `mqtt`.

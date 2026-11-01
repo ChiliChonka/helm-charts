@@ -5,3 +5,6 @@ metadata:
   labels: {{- include "mosquitto.labels" . | nindent 4 }}
 data:
   mosquitto.conf: {{- toYaml .Values.config | nindent 4 }}
+  {{- with .Values.acl }}
+  aclfile: {{- toYaml . | nindent 4 }}
+  {{- end }}

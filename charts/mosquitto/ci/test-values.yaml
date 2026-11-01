@@ -8,6 +8,11 @@ config: |
   protocol websockets
   allow_anonymous false
   password_file /etc/mosquitto/auth/passwordfile
+  acl_file /etc/mosquitto/auth/aclfile
+acl: |
+  user sensor-reader
+  topic read sensors/#
+  pattern readwrite %u/#
 auth:
   existingSecret: example-mosquitto-auth
 persistence:

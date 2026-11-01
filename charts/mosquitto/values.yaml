@@ -39,6 +39,10 @@ auth:
   secretKey: passwordfile
   mountPath: /etc/mosquitto/auth
 
+# ACL file content. Not a secret, so it lives here. Copied next to the password file; name it in
+# config yourself (acl_file /etc/mosquitto/auth/aclfile). Empty: no file.
+acl: ""
+
 # Each TCP probe is a client connect, and with log_type defaults two lines in the broker log.
 livenessProbe:
   tcpSocket: {port: websocket}
@@ -49,7 +53,8 @@ livenessProbe:
 readinessProbe:
   tcpSocket: {port: websocket}
   initialDelaySeconds: 3
-  periodSeconds: 30
+  # The Service gets the pod only after the first success, which can take a full period.
+  periodSeconds: 5
   timeoutSeconds: 3
 
 # fsGroup lets the init container read the Secret (0440) as the broker user.

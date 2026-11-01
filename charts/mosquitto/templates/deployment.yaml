@@ -1,4 +1,5 @@
 {{- $uid := 1883 -}}
+{{- $copy := or .Values.auth.existingSecret .Values.acl -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,14 +25,21 @@ spec:
       {{- with .Values.podSecurityContext }}
       securityContext: {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.auth.existingSecret }}
+      {{- if $copy }}
       initContainers:
         - name: copy-auth
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [sh, -ec]
           args:
-            - cp /secret/passwordfile /auth/passwordfile && chmod 0400 /auth/passwordfile
+            - |
+              {{- if .Values.auth.existingSecret }}
+              cp /secret/passwordfile /auth/passwordfile
+              {{- end }}
+              {{- if .Values.acl }}
+              cp /acl/aclfile /auth/aclfile
+              {{- end }}
+              chmod 0400 /auth/*
           securityContext:
             runAsUser: {{ $uid }}
             runAsGroup: {{ $uid }}
@@ -39,7 +47,12 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
           volumeMounts:
+            {{- if .Values.auth.existingSecret }}
             - {name: auth-secret, mountPath: /secret, readOnly: true}
+            {{- end }}
+            {{- if .Values.acl }}
+            - {name: config, mountPath: /acl, readOnly: true}
+            {{- end }}
             - {name: auth, mountPath: /auth}
       {{- end }}
       containers:
@@ -70,7 +83,7 @@ spec:
               subPath: mosquitto.conf
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
-            {{- if .Values.auth.existingSecret }}
+            {{- if $copy }}
             - name: auth
               mountPath: {{ .Values.auth.mountPath }}
               readOnly: true
@@ -93,6 +106,8 @@ spec:
             defaultMode: 0440
             items:
               - {key: {{ .Values.auth.secretKey }}, path: passwordfile}
+        {{- end }}
+        {{- if $copy }}
         - name: auth
           emptyDir: {medium: Memory, sizeLimit: 1Mi}
         {{- end }}

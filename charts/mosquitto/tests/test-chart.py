@@ -57,7 +57,7 @@ class Probes(unittest.TestCase):
     def test_default_is_not_every_second(self):
         main = find(render(), "Deployment")[0]["spec"]["template"]["spec"]["containers"][0]
         self.assertGreaterEqual(main["livenessProbe"]["periodSeconds"], 15)
-        self.assertGreaterEqual(main["readinessProbe"]["periodSeconds"], 30)
+        self.assertEqual(main["readinessProbe"]["periodSeconds"], 5)
 
     def test_values_reach_the_pod(self):
         main = find(render("--set", "livenessProbe.periodSeconds=77"), "Deployment")[0]
@@ -95,6 +95,32 @@ class Auth(unittest.TestCase):
         pod = find(render(fixture=None), "Deployment")[0]["spec"]["template"]["spec"]
         self.assertNotIn("initContainers", pod)
         self.assertNotIn("auth", [v["name"] for v in pod["volumes"]])
+
+
+class Acl(unittest.TestCase):
+    def test_copied_next_to_the_password_file(self):
+        pod = find(render(), "Deployment")[0]["spec"]["template"]["spec"]
+        init = pod["initContainers"][0]
+        self.assertIn("cp /acl/aclfile /auth/aclfile", init["args"][0])
+        self.assertIn("chmod 0400 /auth/*", init["args"][0])
+        self.assertIn({"name": "config", "mountPath": "/acl", "readOnly": True}, init["volumeMounts"])
+
+    def test_content_in_the_configmap(self):
+        data = find(render(), "ConfigMap")[0]["data"]
+        self.assertIn("pattern readwrite %u/#\n", data["aclfile"])
+
+    def test_works_without_a_secret(self):
+        pod = find(render("--set", "auth.existingSecret="), "Deployment")[0]["spec"]["template"]["spec"]
+        init = pod["initContainers"][0]
+        self.assertNotIn("cp /secret", init["args"][0])
+        self.assertNotIn("auth-secret", [m["name"] for m in init["volumeMounts"]])
+        self.assertIn("auth", [v["name"] for v in pod["volumes"]])
+
+    def test_no_acl_no_file(self):
+        data = find(render("--set", "acl="), "ConfigMap")[0]["data"]
+        self.assertNotIn("aclfile", data)
+        init = find(render("--set", "acl="), "Deployment")[0]["spec"]["template"]["spec"]["initContainers"][0]
+        self.assertNotIn("/acl", init["args"][0])
 
 
 class Config(unittest.TestCase):
