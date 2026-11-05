@@ -27,6 +27,12 @@ Defaults render a broker that refuses everyone: `allow_anonymous false` and no p
 - **ACLs:** `acl` holds the file, and `config` must name it: `acl_file /etc/mosquitto/auth/aclfile`.
   A pattern rule such as `pattern readwrite %u/#` applies to every user. Publishing a denied topic
   fails silently for MQTT 3.1.1 clients, so test each client, not just the connection.
+- **TLS:** `tls.existingSecret` takes a `kubernetes.io/tls` Secret (cert-manager writes one). Key
+  and certificate are copied like the password file, to `/etc/mosquitto/tls`. Name them in
+  `config` right after their listener (`listener 8883 0.0.0.0`, `certfile …/tls.crt`,
+  `keyfile …/tls.key`) and add the port: `ports.mqtts: 8883`. Tested against a real broker: TLS
+  login works, plain MQTT on that port fails with a protocol error. A renewed certificate, like a
+  changed password file, needs a pod restart.
 - **Changed Secret:** the copy happens at pod start, and the broker reads the file only then.
   Restart the pod after a change.
 - **Probes and the log:** each TCP probe is a connection and two log lines. The old chart probed

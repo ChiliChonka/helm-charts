@@ -9,11 +9,18 @@ config: |
   allow_anonymous false
   password_file /etc/mosquitto/auth/passwordfile
   acl_file /etc/mosquitto/auth/aclfile
+  listener 8883 0.0.0.0
+  certfile /etc/mosquitto/tls/tls.crt
+  keyfile /etc/mosquitto/tls/tls.key
 acl: |
   user sensor-reader
   topic read sensors/#
   pattern readwrite %u/#
 auth:
   existingSecret: example-mosquitto-auth
+tls:
+  existingSecret: example-mosquitto-tls
+ports:
+  mqtts: 8883
 persistence:
   storageClass: example-block

@@ -39,6 +39,18 @@ auth:
   secretKey: passwordfile
   mountPath: /etc/mosquitto/auth
 
+# TLS: a kubernetes.io/tls Secret (e.g. from cert-manager) with tls.crt and tls.key. The init
+# container copies both into a memory-backed emptyDir at tls.mountPath, owned by the broker user,
+# like the password file. Name them in config yourself, after the listener they belong to:
+#   listener 8883 0.0.0.0
+#   certfile /etc/mosquitto/tls/tls.crt
+#   keyfile /etc/mosquitto/tls/tls.key
+# and add the port under ports (e.g. mqtts: 8883). A renewed certificate arrives only with a pod
+# restart. Empty: no TLS files.
+tls:
+  existingSecret: ""
+  mountPath: /etc/mosquitto/tls
+
 # ACL file content. Not a secret, so it lives here. Copied next to the password file; name it in
 # config yourself (acl_file /etc/mosquitto/auth/aclfile). Empty: no file.
 acl: ""

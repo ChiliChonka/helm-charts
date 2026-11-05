@@ -141,5 +141,53 @@ class Config(unittest.TestCase):
                             two["spec"]["template"]["metadata"]["annotations"][key])
 
 
+class Tls(unittest.TestCase):
+    """Key and certificate are copied like the password file: no symlink, owned by the broker."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.docs = render()
+        cls.pod = find(cls.docs, "Deployment")[0]["spec"]["template"]["spec"]
+
+    def test_init_copies_key_and_cert(self):
+        init = self.pod["initContainers"][0]
+        self.assertIn("cp /tls-secret/tls.crt /tls-secret/tls.key /tls/", init["args"][0])
+        self.assertIn("chmod 0400 /tls/*", init["args"][0])
+        self.assertIn({"name": "tls-secret", "mountPath": "/tls-secret", "readOnly": True}, init["volumeMounts"])
+        self.assertIn({"name": "tls", "mountPath": "/tls"}, init["volumeMounts"])
+
+    def test_secret_stays_out_of_the_broker(self):
+        main = self.pod["containers"][0]
+        self.assertNotIn("tls-secret", [m["name"] for m in main["volumeMounts"]])
+        tls = [m for m in main["volumeMounts"] if m["name"] == "tls"]
+        self.assertEqual(tls, [{"name": "tls", "mountPath": "/etc/mosquitto/tls", "readOnly": True}])
+        vols = {v["name"]: v for v in self.pod["volumes"]}
+        self.assertEqual(vols["tls"]["emptyDir"], {"medium": "Memory", "sizeLimit": "1Mi"})
+        secret = vols["tls-secret"]["secret"]
+        self.assertEqual(secret["secretName"], "example-mosquitto-tls")
+        self.assertEqual(secret["defaultMode"], 0o440)
+        self.assertEqual([i["key"] for i in secret["items"]], ["tls.crt", "tls.key"])
+
+    def test_port_on_pod_and_service(self):
+        main = self.pod["containers"][0]
+        self.assertIn({"name": "mqtts", "containerPort": 8883, "protocol": "TCP"}, main["ports"])
+        ports = find(self.docs, "Service")[0]["spec"]["ports"]
+        self.assertIn({"name": "mqtts", "port": 8883, "targetPort": "mqtts", "protocol": "TCP"}, ports)
+
+    def test_without_secret_nothing(self):
+        pod = find(render("--set", "tls.existingSecret="), "Deployment")[0]["spec"]["template"]["spec"]
+        self.assertNotIn("/tls", pod["initContainers"][0]["args"][0])
+        names = [v["name"] for v in pod["volumes"]]
+        self.assertNotIn("tls", names)
+        self.assertNotIn("tls-secret", names)
+
+    def test_tls_alone_still_gets_the_init_copy(self):
+        pod = find(render("--set", "auth.existingSecret=", "--set", "acl="), "Deployment")[0]["spec"]["template"]["spec"]
+        init = pod["initContainers"][0]
+        self.assertNotIn("/auth", init["args"][0])
+        self.assertNotIn("auth", [m["name"] for m in init["volumeMounts"]])
+        self.assertIn("cp /tls-secret/tls.crt", init["args"][0])
+
+
 if __name__ == "__main__":
     unittest.main()
