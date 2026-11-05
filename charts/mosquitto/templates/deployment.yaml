@@ -1,5 +1,6 @@
 {{- $uid := 1883 -}}
 {{- $copy := or .Values.auth.existingSecret .Values.acl -}}
+{{- $tls := .Values.tls.existingSecret -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,7 +26,7 @@ spec:
       {{- with .Values.podSecurityContext }}
       securityContext: {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if $copy }}
+      {{- if or $copy $tls }}
       initContainers:
         - name: copy-auth
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -39,7 +40,13 @@ spec:
               {{- if .Values.acl }}
               cp /acl/aclfile /auth/aclfile
               {{- end }}
+              {{- if $copy }}
               chmod 0400 /auth/*
+              {{- end }}
+              {{- if $tls }}
+              cp /tls-secret/tls.crt /tls-secret/tls.key /tls/
+              chmod 0400 /tls/*
+              {{- end }}
           securityContext:
             runAsUser: {{ $uid }}
             runAsGroup: {{ $uid }}
@@ -53,7 +60,13 @@ spec:
             {{- if .Values.acl }}
             - {name: config, mountPath: /acl, readOnly: true}
             {{- end }}
+            {{- if $copy }}
             - {name: auth, mountPath: /auth}
+            {{- end }}
+            {{- if $tls }}
+            - {name: tls-secret, mountPath: /tls-secret, readOnly: true}
+            - {name: tls, mountPath: /tls}
+            {{- end }}
       {{- end }}
       containers:
         - name: mosquitto
@@ -88,6 +101,11 @@ spec:
               mountPath: {{ .Values.auth.mountPath }}
               readOnly: true
             {{- end }}
+            {{- if $tls }}
+            - name: tls
+              mountPath: {{ .Values.tls.mountPath }}
+              readOnly: true
+            {{- end }}
       volumes:
         - name: config
           configMap:
@@ -109,6 +127,17 @@ spec:
         {{- end }}
         {{- if $copy }}
         - name: auth
+          emptyDir: {medium: Memory, sizeLimit: 1Mi}
+        {{- end }}
+        {{- if $tls }}
+        - name: tls-secret
+          secret:
+            secretName: {{ $tls }}
+            defaultMode: 0440
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+        - name: tls
           emptyDir: {medium: Memory, sizeLimit: 1Mi}
         {{- end }}
       {{- with .Values.nodeSelector }}
