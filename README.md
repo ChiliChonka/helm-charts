@@ -22,7 +22,7 @@ tested versions, pitfalls with Garage, Keycloak and Longhorn): [`docs/operators.
 The charts are published as OCI artifacts in the GitHub Container Registry:
 
 ```bash
-helm install jellyfin oci://ghcr.io/chilichonka/charts/jellyfin-helm-chart --version 1.1.0 \
+helm install jellyfin oci://ghcr.io/chilichonka/charts/jellyfin-helm-chart --version 1.2.0 \
   -n jellyfin --create-namespace -f my-values.yaml
 ```
 
