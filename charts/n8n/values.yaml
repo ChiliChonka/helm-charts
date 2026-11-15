@@ -1,0 +1,185 @@
+# Upstream values are nested under n8n (official chart, github.com/n8n-io/n8n-hosting).
+# Infrastructure resources (database, Redis, route, NetworkPolicy) are opt-in.
+# Defaults reference external Secrets; rendering alone is not a complete installation.
+# Never put the encryption key, passwords or tokens in values.
+n8n:
+  # Queue mode: main serves the editor and webhooks, workers run the executions. Required with
+  # Postgres and Redis; binary data then goes to the database (n8n's default in queue mode). S3 for
+  # binary data needs an n8n Business/Enterprise licence, n8n refuses to start without one.
+  queueMode:
+    enabled: true
+    workerReplicaCount: 1
+    workerConcurrency: 5
+  # Dedicated pods that accept production webhook calls, so a burst of calls does not slow down
+  # the editor. Main then stops serving production webhooks (disableProductionWebhooksOnMainProcess),
+  # so the route MUST send /webhook/, /webhook-waiting/, /form/, /form-waiting/ and /mcp/ to the
+  # Service <fullname>-webhook-processor (templates/validate.yaml checks). Test paths stay on main.
+  webhookProcessor:
+    enabled: false
+    replicaCount: 1
+  # Sidecar on the workers that runs Code-node JavaScript and Python apart from n8n (external
+  # mode). Upstream 1.x default is off (internal mode: user code inside the n8n process); n8n 3.0
+  # deprecates internal mode and upstream chart 2.0 turns the sidecar on (decision 0014).
+  taskRunners:
+    enabled: true
+    # From the core Secret below. Otherwise the upstream chart generates a random token and keeps
+    # it via lookup, which `helm template`/`helmfile diff` cannot see: every diff shows a new one.
+    authToken:
+      existingSecret: n8n-core
+      existingSecretKey: N8N_RUNNERS_AUTH_TOKEN
+
+  # Core Secret you create (never in values) with the keys N8N_ENCRYPTION_KEY,
+  # N8N_RUNNERS_AUTH_TOKEN, N8N_HOST, N8N_PORT ("5678") and N8N_PROTOCOL ("https"). The upstream
+  # chart reads host, port and protocol from it as well. Keep the encryption key: without it n8n
+  # cannot decrypt stored credentials.
+  secretRefs:
+    existingSecret: n8n-core
+
+  # CloudNativePG (cnpg below) creates <cnpg.name>-app with user and password.
+  # If changing cnpg.name/owner/database, update these too (templates/validate.yaml checks).
+  database:
+    type: postgresdb
+    useExternal: true
+    host: n8n-db-rw
+    port: 5432
+    database: n8n
+    user: n8n
+    passwordSecret:
+      name: n8n-db-app
+      key: password
+
+  # redis-operator instance (redisOperator below). Same names, checked in templates/validate.yaml.
+  redis:
+    enabled: true
+    useExternal: true
+    host: n8n-redis
+    port: 6379
+    passwordSecret:
+      name: n8n-redis-auth
+      key: password
+
+  # The editor URL and the webhook base URL. Without an Ingress the upstream chart cannot derive
+  # them; set both to the public address of the route, e.g. https://n8n.example.com.
+  editor:
+    url: ""
+  webhook:
+    url: ""
+
+  executions:
+    data:
+      saveOnError: all
+      saveOnSuccess: none
+    pruning:
+      enabled: true
+      maxAge: 336          # hours (14 days)
+
+  # The upstream Role lets n8n read every Secret of the namespace, and the pods carry the
+  # ServiceAccount token: a Code node could read the database password. n8n does not need the
+  # Kubernetes API, so neither.
+  rbac:
+    create: false
+  serviceAccount:
+    create: true
+    name: n8n
+    automountServiceAccountToken: false
+
+  # The upstream NetworkPolicy allows ingress from anywhere and limits egress to DNS, 443, Postgres
+  # and Redis, which breaks workflows calling services on other ports (e.g. Home Assistant on
+  # 8123). Use networkPolicy below instead.
+  networkPolicy:
+    enabled: false
+
+  resources:
+    main:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    worker:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    webhookProcessor:
+      requests: {cpu: 50m, memory: 256Mi}
+      limits: {memory: 1Gi}
+
+# New dedicated database. Plain Postgres is enough for n8n.
+# If changing name/database/owner, update n8n.database.* too.
+cnpg:
+  enabled: false
+  name: n8n-db
+  # Pinned tag, e.g. ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  image: ""
+  instances: 1
+  storageSize: 5Gi
+  storageClass: ""
+  database: n8n
+  owner: n8n
+  affinity: {}
+  # "restart" (CloudNativePG default) or "switchover". Empty = field omitted.
+  primaryUpdateMethod: ""
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 1Gi}
+  parameters: {}
+  backup:
+    enabled: false
+    destinationPath: ""
+    endpointURL: ""
+    credentialsSecret: ""
+    accessKeyIdKey: ACCESS_KEY_ID
+    secretAccessKeyKey: SECRET_ACCESS_KEY
+    # Key in the same Secret that holds the S3 region; empty = not set (client default
+    # us-east-1). Stores that check the region in the signature (Garage) reject the first
+    # HEAD request of a NEW archive otherwise ("Bad request when accessing bucket").
+    regionKey: ""
+    retentionPolicy: "30d"
+    # Six fields, seconds first, UTC.
+    schedule: "0 0 3 * * *"
+
+# OT-CONTAINER-KIT redis-operator; dedicated, authenticated, persistent job queue.
+# If changing name/secret, update n8n.redis.* too.
+redisOperator:
+  enabled: false
+  name: n8n-redis
+  # Pinned tag, e.g. quay.io/opstree/redis:v7.4.11
+  image: ""
+  existingSecret: n8n-redis-auth
+  passwordKey: password
+  storageSize: 1Gi
+  storageClass: ""
+  # The image runs as uid 1000; a fresh block volume belongs to root. Without fsGroup Redis
+  # cannot create its append-only dir ("Permission denied") and crash-loops.
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+# Shared Gateway terminates TLS. The upstream Service is <release>-main, port 5678. Envoy Gateway
+# cuts requests after 15 s unless timeouts.request is set; long-running webhook calls that wait
+# for the workflow ("Respond to Webhook") need a long value.
+httpRoute:
+  enabled: false
+  parentRef: {}
+  # parentRef: {name: my-gateway, namespace: gateway-system, sectionName: https}
+  routes: []
+  # routes:
+  #   - name: n8n
+  #     hostnames: [n8n.example.com]
+  #     rules:
+  #       - backendRefs: [{name: n8n-main, port: 5678}]
+  #         matches: [{path: {type: PathPrefix, value: /}}]
+  #         timeouts: {request: 3600s}
+
+# Ingress restrictions (templates/networkpolicy.yaml). Needs a CNI that enforces NetworkPolicies.
+# - n8n pods: own namespace and the gateway namespace on the n8n port. Egress stays open:
+#   workflows call arbitrary services.
+# - Database and Redis: own namespace and the operators.
+networkPolicy:
+  enabled: false
+  # Namespace of the Gateway's Envoy pods (they connect to the pods directly).
+  gatewayNamespace: ""
+  cnpgOperatorNamespace: cnpg-system
+  redisOperatorNamespace: redis-operator
+  # Namespace of a metrics collector allowed to scrape the Postgres exporter on port 9187.
+  # Empty: no such rule.
+  metricsNamespace: ""
