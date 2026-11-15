@@ -7,7 +7,10 @@ immich:
       containers:
         main:
           image:
-            tag: v3.3.5
+            # Gilt für Server und Machine Learning. Renovate erkennt einen Tag ohne repository nicht,
+            # deshalb der Kommentar (customManagers in renovate.json).
+            # renovate: datasource=docker depName=ghcr.io/immich-app/immich-server
+            tag: v3.4.1
   immich:
     persistence:
       library:
