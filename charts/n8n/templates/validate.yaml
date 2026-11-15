@@ -1,0 +1,55 @@
+{{- /* Fail loudly when the parts do not fit together, instead of pods that never connect. */ -}}
+{{- $n := .Values.n8n }}
+{{- if and .Values.cnpg.backup.enabled (not .Values.cnpg.enabled) }}
+{{- fail "cnpg.backup.enabled requires cnpg.enabled" }}
+{{- end }}
+{{- if .Values.cnpg.enabled }}
+{{- $c := .Values.cnpg }}
+{{- if ne $n.database.host (printf "%s-rw" $c.name) }}
+{{- fail (printf "n8n.database.host must be %s-rw (the CloudNativePG primary service), got %s" $c.name $n.database.host) }}
+{{- end }}
+{{- if ne $n.database.passwordSecret.name (printf "%s-app" $c.name) }}
+{{- fail (printf "n8n.database.passwordSecret.name must be %s-app (created by CloudNativePG), got %s" $c.name $n.database.passwordSecret.name) }}
+{{- end }}
+{{- if or (ne $n.database.user $c.owner) (ne $n.database.database $c.database) }}
+{{- fail (printf "n8n.database.user/database (%s/%s) must match cnpg.owner/database (%s/%s)" $n.database.user $n.database.database $c.owner $c.database) }}
+{{- end }}
+{{- end }}
+{{- if .Values.redisOperator.enabled }}
+{{- $r := .Values.redisOperator }}
+{{- if ne $n.redis.host $r.name }}
+{{- fail (printf "n8n.redis.host must be %s (the Redis service), got %s" $r.name $n.redis.host) }}
+{{- end }}
+{{- if or (ne $n.redis.passwordSecret.name $r.existingSecret) (ne $n.redis.passwordSecret.key $r.passwordKey) }}
+{{- fail "n8n.redis.passwordSecret must be the Secret and key of redisOperator.existingSecret/passwordKey" }}
+{{- end }}
+{{- end }}
+{{- if not $n.secretRefs.existingSecret }}
+{{- fail "n8n.secretRefs.existingSecret is required: the encryption key never goes into values" }}
+{{- end }}
+{{- /* With webhook pods, main no longer serves production webhooks: every path the upstream
+       webhook Ingress would route must reach the webhook-processor Service, else those calls
+       land on main and fail. Matched by the Service's suffix, so the check does not depend on the
+       release name (helm lint renders as test-release); tests/test-chart.py checks that the
+       route's Services exist. */ -}}
+{{- if and $n.webhookProcessor.enabled .Values.httpRoute.enabled }}
+{{- $svc := "<release>-webhook-processor" }}
+{{- $routed := list }}
+{{- range $route := .Values.httpRoute.routes }}
+{{- range $rule := $route.rules }}
+{{- $toWebhook := false }}
+{{- range $b := $rule.backendRefs }}{{ if hasSuffix "-webhook-processor" $b.name }}{{ $toWebhook = true }}{{ end }}{{ end }}
+{{- if $toWebhook }}
+{{- range $m := $rule.matches }}{{ $routed = append $routed (dig "path" "value" "" $m) }}{{ end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range $p := list "/webhook/" "/webhook-waiting/" "/form/" "/form-waiting/" "/mcp/" }}
+{{- if not (has $p $routed) }}
+{{- fail (printf "n8n.webhookProcessor is enabled, but no httpRoute rule sends %s to the Service %s (main no longer serves production webhooks)" $p $svc) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if and .Values.httpRoute.enabled (or (not $n.editor.url) (not $n.webhook.url)) }}
+{{- fail "With httpRoute, set n8n.editor.url and n8n.webhook.url to the route's public URL (no Ingress to derive them from)" }}
+{{- end }}

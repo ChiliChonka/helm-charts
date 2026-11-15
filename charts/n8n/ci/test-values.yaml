@@ -1,0 +1,53 @@
+# Fictional render fixture; existing Secrets are not included.
+cnpg:
+  enabled: true
+  image: ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  instances: 2
+  storageClass: example-block
+  affinity:
+    podAntiAffinityType: required
+  primaryUpdateMethod: switchover
+  backup:
+    enabled: true
+    destinationPath: s3://example-n8n-backup
+    endpointURL: https://s3.example.com
+    credentialsSecret: example-s3-credentials
+    accessKeyIdKey: access-key-id
+    secretAccessKeyKey: secret-access-key
+    regionKey: region
+redisOperator:
+  enabled: true
+  image: quay.io/opstree/redis:v7.4.11
+  storageClass: example-block
+httpRoute:
+  enabled: true
+  parentRef:
+    name: example-internal
+    namespace: example-gateway
+    sectionName: https
+  routes:
+    - name: flow-test
+      hostnames: [flows.example.com]
+      rules:
+        - backendRefs: [{name: flow-test-n8n-main, port: 5678}]
+          matches: [{path: {type: PathPrefix, value: /}}]
+          timeouts: {request: 3600s}
+        - backendRefs: [{name: flow-test-n8n-webhook-processor, port: 5678}]
+          matches:
+            - {path: {type: PathPrefix, value: /webhook/}}
+            - {path: {type: PathPrefix, value: /webhook-waiting/}}
+            - {path: {type: PathPrefix, value: /form/}}
+            - {path: {type: PathPrefix, value: /form-waiting/}}
+            - {path: {type: PathPrefix, value: /mcp/}}
+          timeouts: {request: 3600s}
+networkPolicy:
+  enabled: true
+  gatewayNamespace: example-gateway
+  metricsNamespace: example-monitoring
+n8n:
+  webhookProcessor:
+    enabled: true
+  editor:
+    url: https://flows.example.com
+  webhook:
+    url: https://flows.example.com

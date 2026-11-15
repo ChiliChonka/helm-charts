@@ -1,0 +1,88 @@
+{{- /*
+  Ingress restrictions. Off by default: they only work with a CNI that enforces NetworkPolicies
+  (e.g. Cilium, Calico), and the namespaces must match your cluster.
+
+  - n8n pods (main, worker): pods of the release namespace, and the gateway namespace on the n8n
+    port (Envoy connects to the pods directly). Egress stays open: workflows call arbitrary
+    services. The task-runner sidecar talks to n8n over localhost and needs no rule.
+  - Database: release namespace (app, other instances), the CloudNativePG operator (status on
+    port 8000), optionally a metrics collector on the exporter port 9187.
+  - Redis: release namespace and the Redis operator.
+*/ -}}
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-app
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: n8n
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "networkPolicy.gatewayNamespace is required" $np.gatewayNamespace }}
+      ports:
+        - protocol: TCP
+          {{- /* The parent only sees what values set under n8n, not the subchart defaults. */}}
+          port: {{ dig "service" "port" 5678 .Values.n8n }}
+{{- if .Values.cnpg.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.cnpg.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: {{ .Values.cnpg.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "networkPolicy.cnpgOperatorNamespace is required" $np.cnpgOperatorNamespace }}
+    {{- with $np.metricsNamespace }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 9187
+    {{- end }}
+{{- end }}
+{{- if .Values.redisOperator.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.redisOperator.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.redisOperator.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "networkPolicy.redisOperatorNamespace is required" $np.redisOperatorNamespace }}
+{{- end }}
+{{- end }}

@@ -34,6 +34,7 @@ python3 charts/home-assistant/tests/test-backup.py
 python3 charts/paperless-ngx/tests/test-admin-bootstrap.py
 python3 charts/paperless-ngx/tests/test-v3.py
 python3 charts/immich/tests/test-chart.py
+python3 charts/n8n/tests/test-chart.py
 python3 charts/ocis/tests/test-chart.py
 python3 charts/ocis/tests/test-export.py
 python3 charts/rustical/tests/test-chart.py
