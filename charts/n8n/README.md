@@ -51,6 +51,20 @@ Redis or URLs do not fit together.
 Behind a gateway, set `N8N_PROXY_HOPS: "1"` under `n8n.config.extraEnv` so n8n trusts one
 `X-Forwarded-For` hop (rate limiting, client IPs in the log).
 
+**Nodes without IPv6:** n8n listens on `::` by default and then exits with
+`n8n's address '::' is not available`. Set both addresses under `n8n.config.extraEnv` (reaches
+main, worker and webhook pods):
+
+```yaml
+- {name: N8N_LISTEN_ADDRESS, value: "0.0.0.0"}
+- {name: N8N_WORKER_SERVER_ADDRESS, value: "0.0.0.0"}   # worker health endpoint
+```
+
+**Task runner idle shutdown:** the runner sidecar stops after 15 s without tasks
+(`n8n.taskRunners.launcher.autoShutdownTimeout`), and the next Code-node execution waits for it
+to start again: measured 13 s instead of 0.4 s per webhook call after a pause. `0` keeps it
+running.
+
 [CI values](ci/test-values.yaml) show a complete fictional setup.
 
 ## Route
