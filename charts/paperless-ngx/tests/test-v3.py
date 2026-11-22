@@ -28,7 +28,10 @@ def one(docs, kind, name):
 
 docs = render()
 container = one(docs, 'Deployment', 'paperless-ngx')['spec']['template']['spec']['containers'][0]
-assert container['image'].endswith(':3.3.4'), container['image']
+# The image follows the subchart's appVersion; the umbrella chart states the same (Renovate bumps both).
+version = yaml.safe_load((Path(args.chart) / 'charts' / 'paperless-ngx' / 'Chart.yaml').read_text())['appVersion']
+assert yaml.safe_load((Path(args.chart) / 'Chart.yaml').read_text())['appVersion'] == version
+assert container['image'] == f'ghcr.io/paperless-ngx/paperless-ngx:{version}', container['image']
 
 # Secret key: from the generated Secret, never from the ConfigMap.
 secret_env = [e for e in container['env'] if e['name'] == 'PAPERLESS_SECRET_KEY']
@@ -66,7 +69,7 @@ for mode in ['skip', 'skip_noarchive']:
 assert one(render('--set-string', 'paperless-ngx.paperlessVars.PAPERLESS_OCR_MODE=auto'),
            'ConfigMap', 'paperless-ngx-configuration')['data']['PAPERLESS_OCR_MODE'] == 'auto'
 
-print(f'PASS: image 3.3.4, secret key from Secret, {len(new)} new settings rendered, '
+print(f'PASS: image {version},secret key from Secret, {len(new)} new settings rendered, '
       f'{len(removed) + 2} removed settings rejected')
 
 # startupProbe: absent by default, rendered when configured.
