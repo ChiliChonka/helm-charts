@@ -10,9 +10,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Image-Tags ohne repository daneben (immich: ein Tag für Server und Machine Learning), markiert mit einem Kommentar # renovate: datasource=… depName=… in der Zeile davor.",
+      "description": "Image-Tags ohne repository daneben (immich: ein Tag für Server und Machine Learning; paperless: appVersion im Umbrella- und im lokalen Subchart), markiert mit einem Kommentar # renovate: datasource=… depName=… in der Zeile davor.",
       "managerFilePatterns": [
-        "/^charts/[^/]+/(values|Chart)\\.yaml$/"
+        "/^charts/[^/]+/(charts/[^/]+/)?(values|Chart)\\.yaml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+(?:tag|appVersion): \"?(?<currentValue>[^\"\\s]+)\"?"
