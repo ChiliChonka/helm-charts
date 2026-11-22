@@ -4,9 +4,9 @@ dependencies:
   version: 3.2.2
 - name: gotenberg
   repository: https://maikumori.github.io/helm-charts
-  version: 1.30.0
+  version: 1.31.0
 - name: paperless-ngx
   repository: ""
   version: 0.1.7
-digest: sha256:919dcc38e87488f4e7139c0607bc3c20a3f71e53446c241b04299035eed9bc37
-generated: "2026-11-14T03:01:49.838786739Z"
+digest: sha256:d1c2e45712e011859a21b1b694a9c9994c6bb8919d7a29b78b04c900626eb704
+generated: "2026-11-22T09:02:39.140357299Z"
