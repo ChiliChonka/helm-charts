@@ -1,6 +1,6 @@
 # RustiCal
 
-Own chart for [RustiCal](https://github.com/lennart-k/rustical) **0.16.7**, a CalDAV/CardDAV
+Own chart for [RustiCal](https://github.com/lennart-k/rustical) **0.20.1**, a CalDAV/CardDAV
 server written in Rust: one binary, data in one SQLite database. Login through an OpenID Connect
 provider, app tokens for calendar apps, group calendars, an optional nightly backup with readable
 `.ics`/`.vcf` files, and an HTTPRoute for the Gateway API.
@@ -91,3 +91,9 @@ with timezone and alarm, VTODO, all-day event, deleted event, deleted calendar, 
 vCard 3.0 and 4.0). The backup tests use a local `sqlite3` (CI) or the job's image via Docker;
 they fail when neither exists. They fail against a script that duplicates timezones or exports
 deleted events.
+
+**Upgrade 0.16.7 → 0.20.1** (0.20 rewrote the iCalendar parser), checked on 2026-11-27 against the same
+fixture: 0.20.1 adds one migration (`app token last used`: column `last_used`); every calendar object and
+vCard read through CalDAV/CardDAV (`REPORT`) is byte-identical to 0.16.7, and `files/backup.sh` gives
+identical exports before and after the migration. The chart already sets `enableServiceLinks: false`
+(0.19 also ignores the injected variables itself).
