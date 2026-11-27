@@ -1,7 +1,7 @@
 image:
   repository: eclipse-mosquitto
   # Always a string, and always the full patch release. The 2.1 tags exist only with -alpine.
-  tag: "2.1.2-alpine"
+  tag: "2.1.4-alpine"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
