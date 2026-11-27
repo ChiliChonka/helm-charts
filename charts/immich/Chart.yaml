@@ -2,9 +2,9 @@ apiVersion: v2
 name: immich-helm-chart
 description: Immich with optional CloudNativePG, Redis operator, library PVC and Gateway API resources
 type: application
-version: 0.5.0
+version: 0.5.1
 # renovate: datasource=docker depName=ghcr.io/immich-app/immich-server
-appVersion: "v3.4.1"
+appVersion: "v3.4.2"
 home: https://immich.app
 dependencies:
   - name: immich
