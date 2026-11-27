@@ -8,10 +8,10 @@ to S3, an `HTTPRoute` for the Gateway API, and optionally data from an NFS expor
 |---|---|---|---|---|
 | `jellyfin-helm-chart` | [`charts/jellyfin`](charts/jellyfin) | [Jellyfin](https://jellyfin.org) 12.1, upstream [jellyfin-helm](https://github.com/jellyfin/jellyfin-helm) | — | NFS, Gateway API |
 | `home-assistant-helm-chart` | [`charts/home-assistant`](charts/home-assistant) | [Home Assistant](https://www.home-assistant.io), upstream [pajikos](https://github.com/pajikos/home-assistant-helm-chart) | — | CloudNativePG (recorder DB) + Barman plugin, NFS, Gateway API |
-| `paperless-ngx` | [`charts/paperless-ngx`](charts/paperless-ngx) | [paperless-ngx](https://docs.paperless-ngx.com) 3.3 with Tika and Gotenberg | CloudNativePG, redis-operator | Barman plugin, Gateway API |
+| `paperless-ngx` | [`charts/paperless-ngx`](charts/paperless-ngx) | [paperless-ngx](https://docs.paperless-ngx.com) 3.5 with Tika and Gotenberg | CloudNativePG, redis-operator | Barman plugin, Gateway API |
 | `immich-helm-chart` | [`charts/immich`](charts/immich) | [Immich](https://immich.app) 3.4.1, official upstream chart | PostgreSQL with VectorChord, Redis, library PVC | CloudNativePG, redis-operator, Barman plugin, Gateway API |
 | `n8n-helm-chart` | [`charts/n8n`](charts/n8n) | [n8n](https://n8n.io) 2.49 in queue mode with task runners, official upstream chart | PostgreSQL, Redis | CloudNativePG, redis-operator, Barman plugin, Gateway API |
-| `ocis-helm-chart` | [`charts/ocis`](charts/ocis) | [ownCloud Infinite Scale](https://owncloud.dev/ocis/) 8.2.2, single binary, own chart | — (no database, no cache) | OIDC (Keycloak), NFS for files, Gateway API |
+| `ocis-helm-chart` | [`charts/ocis`](charts/ocis) | [ownCloud Infinite Scale](https://owncloud.dev/ocis/) 8.2.4, single binary, own chart | — (no database, no cache) | OIDC (Keycloak), NFS for files, Gateway API |
 | `rustical-helm-chart` | [`charts/rustical`](charts/rustical) | [RustiCal](https://github.com/lennart-k/rustical) 0.16.7 (CalDAV/CardDAV), own chart | — (SQLite) | OIDC (Keycloak), nightly readable backup, Gateway API |
 | `mosquitto-helm-chart` | [`charts/mosquitto`](charts/mosquitto) | [Mosquitto](https://mosquitto.org) 2.1.2 (MQTT), own chart | — | password file from a Secret |
 
@@ -92,6 +92,10 @@ plus `recorder: db_url: !env_var HA_RECORDER_DB_URL` in `configuration.yaml`.
   would inject `RUSTICAL_*` variables the app rejects.
 - **paperless-ngx 3** requires `PAPERLESS_SECRET_KEY` (the chart generates it once and keeps it);
   settings removed in version 3 make the render fail instead of being silently ignored.
+- **paperless-ngx 3.5:** with `PAPERLESS_URL` set, only `localhost`, the URL's host and
+  `PAPERLESS_ALLOWED_HOSTS` are accepted (before: every host). The chart's HTTP probes therefore
+  send `Host: localhost`, a probe with its own `httpHeaders` keeps them. Other pods calling
+  paperless through its Service name need that name in `PAPERLESS_ALLOWED_HOSTS`.
 
 ## Development
 
