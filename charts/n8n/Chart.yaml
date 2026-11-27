@@ -2,11 +2,11 @@ apiVersion: v2
 name: n8n-helm-chart
 description: n8n in queue mode with the official upstream chart, CloudNativePG, Redis operator and Gateway API resources
 type: application
-version: 0.1.0
+version: 0.1.1
 # n8n version of the upstream chart below; tests/test-chart.py checks that both match.
-appVersion: "2.47.4"
+appVersion: "2.49.6"
 home: https://n8n.io
 dependencies:
   - name: n8n
-    version: 1.19.0
+    version: 1.21.0
     repository: oci://ghcr.io/n8n-io/n8n-helm-chart
