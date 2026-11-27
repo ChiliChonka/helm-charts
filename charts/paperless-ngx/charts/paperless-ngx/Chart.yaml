@@ -3,5 +3,5 @@ name: paperless-ngx
 description: A Helm chart for paperless-ngx.
 type: application
 # renovate: datasource=docker depName=ghcr.io/paperless-ngx/paperless-ngx
-appVersion: "3.4.2"
+appVersion: "3.5.1"
 version: 0.1.7
