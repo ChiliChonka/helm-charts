@@ -1,6 +1,6 @@
 # Mosquitto
 
-Own chart for [Eclipse Mosquitto](https://mosquitto.org) **2.1.2**: one broker, a persistent
+Own chart for [Eclipse Mosquitto](https://mosquitto.org) **2.1.4**: one broker, a persistent
 volume, passwords from an existing Secret and probes you can set. It replaces `t3n/mosquitto`
 2.4.1 in place: object names, selectors and the volume stay the same, so `helm upgrade` of a
 release named `mosquitto` keeps the data.
