@@ -2,8 +2,8 @@ apiVersion: v2
 name: ocis-helm-chart
 description: ownCloud Infinite Scale (single binary) with persistent volumes, optional Keycloak/OIDC and Gateway API
 type: application
-version: 0.1.3
-appVersion: "8.2.3"
+version: 0.1.4
+appVersion: "8.2.4"
 home: https://owncloud.dev/ocis/
 sources:
   - https://github.com/owncloud/ocis
