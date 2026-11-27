@@ -1,4 +1,18 @@
 {{/*
+A probe with httpGet asks as Host "localhost" unless it sets httpHeaders itself. The kubelet
+otherwise sends the pod IP, and paperless-ngx >= 3.5 answers 400 (DisallowedHost) as soon as
+PAPERLESS_URL is set: ALLOWED_HOSTS is then only localhost, the URL host and
+PAPERLESS_ALLOWED_HOSTS. localhost is always allowed (upstream: for the Docker health check).
+*/}}
+{{- define "paperless-ngx.probe" -}}
+{{- $probe := deepCopy . -}}
+{{- if and (kindIs "map" $probe.httpGet) (not (hasKey $probe.httpGet "httpHeaders")) -}}
+{{- $_ := set $probe.httpGet "httpHeaders" (list (dict "name" "Host" "value" "localhost")) -}}
+{{- end -}}
+{{- toYaml $probe -}}
+{{- end }}
+
+{{/*
 Expand the name of the chart.
 */}}
 {{- define "webserver.name" -}}
