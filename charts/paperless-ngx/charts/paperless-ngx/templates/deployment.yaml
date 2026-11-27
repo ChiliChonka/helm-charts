@@ -99,12 +99,12 @@ spec:
             migrations BEFORE starting the web server; v3 re-hashes every file while doing so.
           */}}
           startupProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- include "paperless-ngx.probe" . | nindent 12 }}
           {{- end }}
           livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
+            {{- include "paperless-ngx.probe" .Values.livenessProbe | nindent 12 }}
           readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
+            {{- include "paperless-ngx.probe" .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- with .Values.volumeMounts }}

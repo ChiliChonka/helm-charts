@@ -77,8 +77,26 @@ assert 'startupProbe' not in container
 probe = {'httpGet': {'path': '/', 'port': 'http'}, 'periodSeconds': 10, 'failureThreshold': 180}
 with_probe = render('--set-json', 'paperless-ngx.startupProbe=' + json.dumps(probe))
 rendered = one(with_probe, 'Deployment', 'paperless-ngx')['spec']['template']['spec']['containers'][0]
-assert rendered['startupProbe'] == probe, rendered.get('startupProbe')
+local = [{'name': 'Host', 'value': 'localhost'}]
+assert rendered['startupProbe'] == {**probe, 'httpGet': {**probe['httpGet'], 'httpHeaders': local}}, \
+    rendered.get('startupProbe')
 print('PASS: startupProbe optional')
+
+# Probes ask as Host localhost: from 3.5 on, paperless answers the pod IP with 400 once PAPERLESS_URL is
+# set (measured 2026-11-27 in Docker: 3.4.2 -> 302, 3.5.1 -> 400 DisallowedHost; localhost 302 in both).
+for name in ['livenessProbe', 'readinessProbe']:
+    assert container[name]['httpGet']['httpHeaders'] == local, container[name]
+# Own headers win; probes without httpGet stay untouched.
+own = {'httpGet': {'path': '/', 'port': 'http',
+                   'httpHeaders': [{'name': 'Host', 'value': 'paperless.example.com'}]}}
+tcp = {'httpGet': None, 'tcpSocket': {'port': 'http'}}   # values merge: drop the default httpGet
+c = one(render('--set-json', 'paperless-ngx.livenessProbe=' + json.dumps(own),
+               '--set-json', 'paperless-ngx.readinessProbe=' + json.dumps(tcp)),
+        'Deployment', 'paperless-ngx')['spec']['template']['spec']['containers'][0]
+assert c['livenessProbe']['httpGet'] == own['httpGet'], c['livenessProbe']
+assert 'httpGet' not in c['readinessProbe'] and c['readinessProbe']['tcpSocket'] == tcp['tcpSocket'], \
+    c['readinessProbe']
+print('PASS: probes send Host localhost unless they set their own headers')
 
 # Every image pinned: no implicit or explicit `latest`.
 images = [c['image'] for d in docs if d['kind'] in ('Deployment', 'StatefulSet')
