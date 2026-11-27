@@ -6,7 +6,7 @@ OT-CONTAINER-KIT Redis, an HTTPRoute and NetworkPolicies. Operators, Gateway and
 prerequisites; see [platform setup](../../docs/operators.md). No cluster-wide resources or
 credentials are created.
 
-Verified upstream versions on 2026-11-15: chart **1.19.0**, n8n **2.47.4**
+Verified upstream versions on 2026-11-27: chart **1.21.0**, n8n **2.49.6**
 (`docker.n8n.io/n8nio/n8n`, task runner `n8nio/runners`). The upstream 1.x line follows n8n 2.x;
 chart 2.0 ships with n8n 3.0 and changes values keys (its `UPGRADING.md`). `appVersion` here
 must equal the upstream chart's (checked by the tests): the image tag follows the upstream chart.
